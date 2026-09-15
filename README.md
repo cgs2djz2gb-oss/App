@@ -79,12 +79,17 @@ und auf dem anderen Gerät → *Daten laden (JSON)*.
 
 ### Veröffentlichen
 
-Jeder Static-Hoster genügt, die App braucht keinen Build.
+Jeder Static-Hoster genügt, die App braucht keinen Build-Schritt.
 
+- **Vercel (eingerichtet):** `vercel.json` liegt bei – kein Install, als „Build" laufen die
+  Logiktests (ein roter Test verhindert das Deployment), ausgeliefert wird das Repo-Wurzelverzeichnis.
+  Ist das Projekt mit dem Repository verbunden, geht jeder Push auf den Default-Branch live.
 - **GitHub Pages:** in den Repo-Einstellungen unter *Pages* als Quelle *GitHub Actions* wählen –
   `.github/workflows/pages.yml` veröffentlicht dann jeden Push auf `main`.
-- **Netlify/Vercel/Cloudflare Pages:** Repo verbinden, kein Build-Befehl, Ausgabeverzeichnis `.`
+- **Netlify/Cloudflare Pages:** Repo verbinden, kein Build-Befehl, Ausgabeverzeichnis `.`
 - **Eigener Server:** Ordner hochladen. HTTPS ist Pflicht, sonst startet der Service Worker nicht.
+- **Ganz ohne Server:** `node scripts/build.mjs` erzeugt `dist/index.html` – eine einzige Datei,
+  die sich per Doppelklick öffnen lässt und alles enthält.
 
 ## Lokal starten
 
@@ -114,7 +119,7 @@ app/
   transfer.js         Übertragung zwischen Geräten per Link
   ui.js               Sheet, Menü, Toasts
 sw.js                 Service Worker (Offline)
-scripts/              Dev-Server, Icon-Generator, Browser-Test
+scripts/              Dev-Server, Icon-Generator, Browser-Test, Einzeldatei-Build
 tests/run.mjs         Logiktests
 ```
 
