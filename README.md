@@ -53,14 +53,31 @@ die App sucht dafür automatisch die nächste freie Lücke im Tag.
 - Beim Öffnen auf dem anderen Gerät: *Ersetzen* oder *Zusammenführen*
 - Das ist eine Übertragung, **kein laufender Abgleich** – beide Geräte speichern weiter für sich
 
+**Fokus-Session**
+- Block starten (Kontextmenü, Editor oder Taste `F`): Countdown über die geplante Dauer,
+  Checkliste zum Abhaken, Notizen im Blick
+- Pause, +5 Minuten, abbrechen oder „Erledigt" (hakt den Termin ab)
+- Läuft im Hintergrund weiter – die Kopfzeile zeigt die Restzeit, ein Klick holt die Ansicht zurück
+- Ist die Zeit um, meldet sich die App mit kurzem Ton und Vibration
+
+**Bedienung**
+- Rechtsklick auf einen Block: bearbeiten, erledigt, duplizieren, Farbe, löschen
+- Tastatur: Blöcke sind mit `Tab` erreichbar, Pfeile verschieben, `⇧`+Pfeil dehnt,
+  `⌥`+Pfeil in 5-Minuten-Schritten, `Enter` öffnet, `Entf` löscht, `F` startet die Session
+- Aufgaben lassen sich aus der Seitenleiste direkt ins Raster ziehen
+- Auf dem Handy: waagerecht wischen blättert, senkrecht scrollt, Tippen legt an,
+  langes Drücken auf einem Block startet das Verschieben
+
 **Drumherum**
 - Überblick: geplante Stunden pro Tag/Woche, erledigte Blöcke, Balken über die Woche
 - Rückgängig/Wiederherstellen (⌘Z / ⇧⌘Z)
 - Sicherung als JSON exportieren und importieren (auch zum Umzug aufs zweite Gerät)
+- Automatische Sicherheitskopie vor „alles löschen" und vor einem ersetzenden Import –
+  im Menü zurückholbar (nochmal zurückholen führt wieder zurück)
 - Beispielwoche zum Ausprobieren (Menü ⋯)
 - Offline nutzbar, Daten bleiben auf dem Gerät
 
-**Kurzbefehle:** `←`/`→` blättern · `T` heute · `D`/`W` Ansicht · `N` neuer Block · `⌘Z` zurück · `Esc` schließen
+**Kurzbefehle:** `←`/`→` blättern · `T` heute · `D`/`W` Ansicht · `N` neuer Block · `F` Fokus · `⌘Z` zurück · `Esc` schließen
 
 ## Auf dem Gerät installieren
 
@@ -95,9 +112,9 @@ Jeder Static-Hoster genügt, die App braucht keinen Build-Schritt.
 
 ```bash
 npm run dev          # http://localhost:4173
-npm test             # 23 Logiktests (Serien, Datum, Vorlagen, Übertragung, Speicher)
-npm run test:browser # 23 End-to-End-Checks im echten Chromium
-                     # (Ziehen, Tagwechsel, Editor, Vorlagen, Übertragungslink, Mobil, Dunkelmodus)
+npm test             # 25 Logiktests (Serien, Datum, Vorlagen, Übertragung, Sicherung, Speicher)
+npm run test:browser # 46 End-to-End-Checks im echten Chromium (Ziehen, Tastatur, Kontextmenü,
+                     # Fokus-Session, Vorlagen, Übertragung, Sicherung, Mobil, Dunkelmodus)
 ```
 
 Node 22+, sonst nichts. **Null Abhängigkeiten** – kein Bundler, kein Framework,
@@ -114,7 +131,8 @@ app/
   recurrence.js       Serien → konkrete Termine, Überlappungs-Layout
   grid.js             Raster, Ziehen, Dehnen, Anlegen (Maus + Touch)
   editor.js           Block-Editor (Serien, Checkliste, Farben)
-  panels.js           Wochenaufgaben, Tages-To-dos, Überblick
+  panels.js           Wochenaufgaben, Tages-To-dos, Überblick, Ziehen ins Raster
+  session.js          Fokus-Session mit Countdown und Checkliste
   templates.js        Wochen-Vorlagen sichern und anwenden
   transfer.js         Übertragung zwischen Geräten per Link
   ui.js               Sheet, Menü, Toasts

@@ -299,6 +299,30 @@ test('Übertragungspaket ist verlustfrei (gzip + base64url)', async () => {
   assert.ok(b64.length < json.length, 'Link ist kürzer als die Rohdaten');
 });
 
+test('Import mit Ersetzen legt vorher eine Sicherung an', () => {
+  freshState();
+  store.createBlock({ title: 'Alter Stand', date: '2026-09-14', start: 540, duration: 60 });
+  const fremd = JSON.stringify({ blocks: [{ id: 'x', title: 'Fremder Stand', date: '2026-09-15', start: 600, duration: 30 }] });
+  store.importJson(fremd);
+  assert.equal(store.getState().blocks[0].title, 'Fremder Stand');
+
+  const info = store.getBackupInfo();
+  assert.ok(info, 'Sicherung vorhanden');
+  assert.equal(info.blocks, 1);
+
+  store.restoreBackup();
+  assert.equal(store.getState().blocks[0].title, 'Alter Stand', 'alter Stand ist zurück');
+
+  store.restoreBackup();
+  assert.equal(store.getState().blocks[0].title, 'Fremder Stand', 'nochmal zurückholen führt zurück');
+});
+
+test('Sicherung ohne vorhandene Daten wird nicht angelegt', () => {
+  freshState();
+  store.importJson(JSON.stringify({ blocks: [] }));
+  assert.equal(store.getBackupInfo(), null);
+});
+
 const results = [];
 for (const [name, fn] of tests) {
   try {

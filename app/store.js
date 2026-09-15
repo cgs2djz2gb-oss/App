@@ -2,6 +2,7 @@
 import { todayYmd, weekKey } from './dates.js';
 
 const KEY = 'tagwerk.state.v1';
+const BACKUP_KEY = 'tagwerk.backup.v1';
 const MAX_UNDO = 60;
 
 export const COLORS = [
@@ -365,6 +366,55 @@ export function clearOccurrences(occs) {
   });
 }
 
+// ---------- Sicherheitsnetz ----------
+
+/**
+ * Vor zerstörenden Schritten (Löschen, Ersetzen beim Import) eine Kopie
+ * beiseitelegen. Undo hilft nach einem Neuladen nicht mehr, die hier schon.
+ */
+export function saveBackup(reason) {
+  try {
+    localStorage.setItem(BACKUP_KEY, JSON.stringify({
+      savedAt: new Date().toISOString(),
+      reason,
+      state,
+    }));
+    return true;
+  } catch (err) {
+    console.warn('Sicherung fehlgeschlagen:', err);
+    return false;
+  }
+}
+
+export function getBackupInfo() {
+  try {
+    const raw = localStorage.getItem(BACKUP_KEY);
+    if (!raw) return null;
+    const { savedAt, reason, state: saved } = JSON.parse(raw);
+    return {
+      savedAt,
+      reason,
+      blocks: Array.isArray(saved?.blocks) ? saved.blocks.length : 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Sicherung zurückholen. Der jetzige Stand wird dabei selbst zur Sicherung –
+ * ein zweiter Aufruf führt also wieder zurück.
+ */
+export function restoreBackup() {
+  const raw = localStorage.getItem(BACKUP_KEY);
+  if (!raw) return false;
+  const { state: saved } = JSON.parse(raw);
+  const restored = migrate(saved);
+  saveBackup('vor dem Zurückholen');
+  mutate((s) => { Object.assign(s, restored); });
+  return true;
+}
+
 // ---------- Fokus-Session ----------
 
 /** Laufende Session setzen oder mit null beenden (kein Undo-Schritt). */
@@ -382,6 +432,9 @@ export function exportJson() {
 
 export function importJson(text, { merge = false } = {}) {
   const incoming = migrate(JSON.parse(text));
+  if (!merge && (state.blocks.length || state.weekTasks.length || state.dayTodos.length)) {
+    saveBackup('vor dem Ersetzen beim Import');
+  }
   mutate((s) => {
     if (!merge) {
       Object.assign(s, incoming, { settings: { ...s.settings, ...incoming.settings } });

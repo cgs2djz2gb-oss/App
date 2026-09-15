@@ -1,13 +1,14 @@
 // Zeitraster: Rendering der Tages-/Wochenansicht plus Ziehen, Größe ändern, Anlegen.
 import { addDays, dowOf, fmtTime, todayYmd, nowMinutes, DOW_SHORT, fmtHours, parseYmd } from './dates.js';
 import { occurrencesByDate, layoutDay, plannedMinutes } from './recurrence.js';
-import { getState, moveOccurrence, patchOccurrence } from './store.js';
+import { getState, moveOccurrence, patchOccurrence, deleteOccurrence } from './store.js';
 import { toast, el } from './ui.js';
 
 let app = null;               // wird von main.js gesetzt
 let buckets = new Map();
 let nowTimer = null;
 let didInitialScroll = false;
+let focusedKey = null;   // Block, der zuletzt die Tastatur hatte
 
 export function initGrid(appRef) {
   app = appRef;
@@ -41,6 +42,10 @@ export function visibleDates() {
 export function renderPlanner() {
   const dates = visibleDates();
   const state = getState();
+  // Vor dem Neuaufbau merken, welcher Block die Tastatur hat - das Entfernen
+  // der alten Elemente löst sonst ein blur aus und der Fokus wäre weg.
+  const active = document.activeElement;
+  if (active && active.classList && active.classList.contains('block')) focusedKey = active.dataset.key;
   buckets = occurrencesByDate(state, dates[0], dates[dates.length - 1]);
 
   document.documentElement.style.setProperty('--hour-h', `${hourH()}px`);
@@ -48,6 +53,12 @@ export function renderPlanner() {
   renderColumns(dates);
   renderNowLine();
   document.getElementById('empty-state').hidden = state.blocks.length > 0;
+
+  if (focusedKey) {
+    const again = document.querySelector(`.block[data-key="${CSS.escape(focusedKey)}"]`);
+    if (again) again.focus({ preventScroll: true });
+    else focusedKey = null;
+  }
 
   if (!didInitialScroll) {
     didInitialScroll = true;
@@ -123,8 +134,19 @@ export function renderBlock(occ, lane = { lane: 0, lanes: 1 }) {
   const doneTodos = occ.todos.filter((t) => t.done).length;
   const short = h < 38;
 
+  const label = [
+    occ.title || 'Ohne Titel',
+    `${fmtTime(occ.start)} bis ${fmtTime(occ.start + occ.duration)}`,
+    occ.isRecurring ? 'Teil einer Serie' : null,
+    occ.todos.length ? `${doneTodos} von ${occ.todos.length} Schritten erledigt` : null,
+    occ.done ? 'erledigt' : null,
+  ].filter(Boolean).join(', ');
+
   const node = el('div', {
     class: `block ${short ? 'short' : ''} ${occ.done ? 'done' : ''}`,
+    tabindex: '0',
+    role: 'button',
+    'aria-label': label,
     style: `top:${top}px;height:${h}px;left:calc(${left}% + 2px);width:calc(${width}% - 4px);` +
            `--bg-c:var(--c-${occ.color}-bg);--fg-c:var(--c-${occ.color})`,
     dataset: { key: occ.key, blockId: occ.blockId, date: occ.date, anchor: occ.anchorDate },
@@ -139,7 +161,75 @@ export function renderBlock(occ, lane = { lane: 0, lanes: 1 }) {
     el('div', { class: 'handle bottom' }),
   ]);
   node._occ = occ;
+  node.addEventListener('focus', () => { focusedKey = occ.key; });
+  node.addEventListener('keydown', onBlockKeydown);
   return node;
+}
+
+/** Blöcke mit der Tastatur bewegen: Pfeile schieben, Umschalt dehnt. */
+function onBlockKeydown(e) {
+  const occ = e.currentTarget._occ;
+  if (!occ) return;
+  const step = e.altKey ? 5 : settings().snap;
+
+  const moveTo = (start, date = occ.date) => {
+    if (occ.isRecurring) moveOccurrence(occ.blockId, occ.anchorDate, date, start, 'single');
+    else patchOccurrence(occ.blockId, occ.date, { start, date }, 'series');
+    app.refresh();
+  };
+  const resizeTo = (duration) => {
+    patchOccurrence(occ.blockId, occ.anchorDate, { duration }, occ.isRecurring ? 'single' : 'series');
+    app.refresh();
+  };
+
+  switch (e.key) {
+    case 'Enter':
+    case ' ':
+      e.preventDefault();
+      app.openEditor(occ);
+      break;
+    case 'ArrowUp':
+    case 'ArrowDown': {
+      e.preventDefault();
+      e.stopPropagation();
+      const dir = e.key === 'ArrowDown' ? 1 : -1;
+      if (e.shiftKey) {
+        resizeTo(clamp(occ.duration + dir * step, settings().snap, dayEndMin() - occ.start));
+      } else {
+        moveTo(clamp(occ.start + dir * step, dayStartMin(), dayEndMin() - occ.duration));
+      }
+      break;
+    }
+    case 'ArrowLeft':
+    case 'ArrowRight': {
+      if (app.view !== 'week') return;
+      e.preventDefault();
+      e.stopPropagation();
+      const dates = visibleDates();
+      const idx = dates.indexOf(occ.date);
+      const next = dates[clamp(idx + (e.key === 'ArrowRight' ? 1 : -1), 0, dates.length - 1)];
+      if (next !== occ.date) moveTo(occ.start, next);
+      break;
+    }
+    case 'Delete':
+    case 'Backspace': {
+      e.preventDefault();
+      e.stopPropagation();
+      deleteOccurrence(occ.blockId, occ.anchorDate, occ.isRecurring ? 'single' : 'series');
+      focusedKey = null;
+      app.refresh();
+      toast('Gelöscht', { label: 'Rückgängig', onClick: () => app.undoAll(1) });
+      break;
+    }
+    case 'f':
+    case 'F':
+      e.preventDefault();
+      e.stopPropagation();
+      app.startSession(occ);
+      break;
+    default:
+      break;
+  }
 }
 
 function renderNowLine() {

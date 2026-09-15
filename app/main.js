@@ -4,7 +4,7 @@ import {
 } from './dates.js';
 import {
   load, getState, setSetting, undo, redo, exportJson, importJson, createBlock, uid,
-  COLORS, patchOccurrence, deleteOccurrence,
+  COLORS, patchOccurrence, deleteOccurrence, saveBackup, getBackupInfo, restoreBackup,
 } from './store.js';
 import { initGrid, renderPlanner } from './grid.js';
 import { initPanels, renderPanels } from './panels.js';
@@ -211,7 +211,26 @@ function weekendSetting() {
   return el('label', { class: 'menu-item' }, ['Wochenende anzeigen', cb]);
 }
 
+function backupLabel(info) {
+  const d = new Date(info.savedAt);
+  const when = d.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  return `${when}, ${info.blocks} Blöcke`;
+}
+
+async function doRestore() {
+  const info = getBackupInfo();
+  if (!info) return;
+  const ok = await choose('Sicherung zurückholen?', [
+    { label: 'Zurückholen', value: 'yes', primary: true },
+  ], { text: `Stand vom ${backupLabel(info)} (${info.reason}). Der jetzige Stand wird dabei ersetzt – rückgängig machen geht anschließend mit ⌘Z.` });
+  if (ok !== 'yes') return;
+  restoreBackup();
+  app.refresh();
+  toast('Sicherung zurückgeholt');
+}
+
 function openMainMenu(anchor) {
+  const backup = getBackupInfo();
   openMenu([
     { type: 'title', label: 'Tagesraster' },
     { type: 'custom', node: numberSetting('Beginn (Uhr)', 'dayStart', 0, 12) },
@@ -227,9 +246,13 @@ function openMainMenu(anchor) {
     { label: 'Daten laden (JSON)', onClick: doImport },
     { label: 'Beispielwoche einfügen', onClick: seedDemo },
     '-',
+    backup && {
+      label: `Sicherung zurückholen (${backupLabel(backup)})`,
+      onClick: doRestore,
+    },
     { label: 'Alle Daten löschen', onClick: wipe },
     { label: 'Kurzbefehle & Hilfe', onClick: showHelp },
-  ], anchor.getBoundingClientRect());
+  ].filter(Boolean), anchor.getBoundingClientRect());
 }
 
 function doExport() {
@@ -264,8 +287,9 @@ function doImport() {
 async function wipe() {
   const ok = await choose('Wirklich alle Daten löschen?', [
     { label: 'Ja, alles löschen', value: 'yes', danger: true },
-  ], { text: 'Blöcke, Aufgaben und To-dos auf diesem Gerät werden entfernt. Vorher ggf. sichern.' });
+  ], { text: 'Blöcke, Aufgaben und To-dos auf diesem Gerät werden entfernt. Eine Kopie wird beiseitegelegt – über das Menü lässt sie sich zurückholen.' });
   if (ok !== 'yes') return;
+  saveBackup('vor dem Löschen aller Daten');
   localStorage.removeItem('tagwerk.state.v1');
   location.reload();
 }

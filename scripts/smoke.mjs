@@ -231,6 +231,34 @@ async function main() {
   check('Duplizieren legt einen Block an',
     (await cdp.eval(`document.querySelectorAll('.block').length`)) === blocksBeforeDup + 1);
 
+  // --- Tastaturbedienung ---
+  const kb = await cdp.eval(pickVisible);
+  const press = async (key, opts = {}) => {
+    await cdp.eval(`(() => {
+      const b = [...document.querySelectorAll('.block')].find(n => n.dataset.key === ${JSON.stringify(kb.key)});
+      b.focus();
+      b.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, bubbles: true, cancelable: true, ...${JSON.stringify(opts)} }));
+    })()`);
+    await sleep(180);
+  };
+  const startOf = () => cdp.eval(`(() => {
+    const b = [...document.querySelectorAll('.block')].find(n => n.dataset.key === ${JSON.stringify(kb.key)});
+    return b ? { start: b._occ.start, duration: b._occ.duration, focused: document.activeElement === b } : null;
+  })()`);
+
+  check('Blöcke sind mit Tab erreichbar',
+    await cdp.eval(`document.querySelector('.block').tabIndex === 0 && !!document.querySelector('.block').getAttribute('aria-label')`));
+  await press('ArrowDown');
+  const afterDown = await startOf();
+  check('Pfeiltaste verschiebt den Block', afterDown.start === kb.start + 15, `${kb.start} → ${afterDown.start}`);
+  check('Fokus bleibt nach dem Neuzeichnen am Block', afterDown.focused);
+  await press('ArrowDown', { shiftKey: true });
+  const afterResize = await startOf();
+  check('Umschalt + Pfeil dehnt den Block', afterResize.duration === afterDown.duration + 15,
+    `${afterDown.duration} → ${afterResize.duration}`);
+  await press('ArrowUp');
+  await press('ArrowUp', { shiftKey: true });
+
   // --- Aufgabe in den Kalender ziehen ---
   const droppedTitle = 'Übungsblatt 3 abgeben';
   const dragResult = await cdp.eval(`(() => {
@@ -357,6 +385,28 @@ async function main() {
   check('Daten überleben Neuladen',
     (await cdp.eval(`document.querySelectorAll('.block').length`)) > 5 &&
     (await cdp.eval(`document.querySelectorAll('#list-weektasks li').length`)) === 1);
+
+  // --- Alles löschen und aus der Sicherung zurückholen ---
+  const blocksBeforeWipe = await cdp.eval(`JSON.parse(localStorage.getItem('tagwerk.state.v1')).blocks.length`);
+  await cdp.eval(`document.getElementById('btn-menu').click()`);
+  await sleep(120);
+  await cdp.eval(`[...document.querySelectorAll('#menu button')].find(b => b.textContent.includes('Alle Daten löschen')).click()`);
+  await sleep(200);
+  await cdp.eval(`[...document.querySelectorAll('#sheet .btn')].find(b => b.textContent.includes('Ja, alles löschen')).click()`);
+  await sleep(900);
+  check('Alles löschen räumt auf',
+    (await cdp.eval(`document.querySelectorAll('.block').length`)) === 0);
+  await cdp.eval(`document.getElementById('btn-menu').click()`);
+  await sleep(150);
+  check('Sicherung wird im Menü angeboten',
+    await cdp.eval(`[...document.querySelectorAll('#menu button')].some(b => b.textContent.includes('Sicherung zurückholen'))`));
+  await cdp.eval(`[...document.querySelectorAll('#menu button')].find(b => b.textContent.includes('Sicherung zurückholen')).click()`);
+  await sleep(200);
+  await cdp.eval(`[...document.querySelectorAll('#sheet .btn')].find(b => b.textContent === 'Zurückholen').click()`);
+  await sleep(350);
+  check('Sicherung stellt die Blöcke wieder her',
+    (await cdp.eval(`document.querySelectorAll('.block').length`)) > 0,
+    `vorher ${blocksBeforeWipe} Blöcke`);
 
   // --- Leerer Zustand ---
   await cdp.eval(`localStorage.clear()`);

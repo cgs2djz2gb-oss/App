@@ -191,6 +191,10 @@ ul { margin: 0; padding: 0; list-style: none; }
   box-shadow: 0 1px 1px rgba(0,0,0,.05); z-index: 3;
 }
 .block:active { cursor: grabbing; }
+.block:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent);
+}
 .block.dragging { z-index: 20; box-shadow: var(--shadow); opacity: .96; transform: scale(1.015); }
 .block .b-title { font-weight: 600; font-size: 12.5px; line-height: 1.25; padding-right: 16px; }
 .block .b-meta { font-size: 11px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
