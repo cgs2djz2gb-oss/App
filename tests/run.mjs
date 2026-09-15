@@ -128,11 +128,53 @@ test('Serie als Ganzes auf einen anderen Wochentag schieben', () => {
   const state = store.getState();
   const block = state.blocks[0];
   assert.deepEqual(block.recur.weekdays, [2], 'Montag wird Dienstag');
-  assert.equal(block.date, '2026-09-14', 'Serienstart bleibt unverändert');
+  assert.equal(block.date, '2026-09-15', 'Serienstart rutscht in derselben Woche auf den neuen Wochentag');
   assert.equal(block.start, 1140);
   const at = (d) => occurrencesByDate(state, d, d).get(d) || [];
   assert.equal(at('2026-09-15').length, 1, 'erste Woche bereits am Dienstag');
   assert.equal(at('2026-09-14').length, 0);
+});
+
+test('Serie auf einen anderen Wochentag: die laufende Woche bleibt bestehen', () => {
+  freshState();
+  const id = store.createBlock({
+    title: 'Vorlesung', date: '2026-09-16', start: 600, duration: 90,
+    recur: { every: 1, weekdays: [3], until: null },   // Mittwoch
+  });
+  store.moveOccurrence(id, '2026-09-16', '2026-09-14', 600, 'series');  // auf Montag
+  const state = store.getState();
+  const at = (d) => occurrencesByDate(state, d, d).get(d) || [];
+  assert.deepEqual(state.blocks[0].recur.weekdays, [1]);
+  assert.equal(at('2026-09-14').length, 1, 'diese Woche bereits am Montag');
+  assert.equal(at('2026-09-21').length, 1, 'Folgewoche ebenso');
+  assert.equal(at('2026-09-16').length, 0, 'am alten Mittwoch nicht mehr');
+});
+
+test('Zweiwöchentliche Serie behält beim Wochentagswechsel ihren Rhythmus', () => {
+  freshState();
+  const id = store.createBlock({
+    title: 'Lerngruppe', date: '2026-09-18', start: 960, duration: 120,
+    recur: { every: 2, weekdays: [5], until: null },   // Freitag, alle zwei Wochen
+  });
+  store.moveOccurrence(id, '2026-09-18', '2026-09-17', 960, 'series');  // auf Donnerstag
+  const state = store.getState();
+  const at = (d) => (occurrencesByDate(state, d, d).get(d) || []).length;
+  assert.equal(at('2026-09-17'), 1, 'diese Woche');
+  assert.equal(at('2026-09-24'), 0, 'Woche dazwischen bleibt frei');
+  assert.equal(at('2026-10-01'), 1, 'zwei Wochen später');
+});
+
+test('Undo lässt Einstellungen und laufende Session in Ruhe', () => {
+  freshState();
+  store.setSetting('view', 'week');
+  store.createBlock({ title: 'A', date: '2026-09-14', start: 540, duration: 60 });
+  store.setSetting('view', 'day');
+  store.setSession({ blockId: 'x', anchorDate: '2026-09-14' });
+
+  store.undo();
+  assert.equal(store.getState().blocks.length, 0, 'der Block ist weg');
+  assert.equal(store.getState().settings.view, 'day', 'die Ansicht bleibt');
+  assert.ok(store.getState().session, 'die Session läuft weiter');
 });
 
 test('Einzelnen Serientermin löschen', () => {
@@ -315,6 +357,22 @@ test('Import mit Ersetzen legt vorher eine Sicherung an', () => {
 
   store.restoreBackup();
   assert.equal(store.getState().blocks[0].title, 'Fremder Stand', 'nochmal zurückholen führt zurück');
+});
+
+test('Alles löschen leert den Zustand und legt eine Sicherung an', () => {
+  freshState();
+  store.createBlock({ title: 'Wichtig', date: '2026-09-14', start: 540, duration: 60 });
+  store.addWeekTask('2026-09-14', 'Nicht vergessen');
+  store.setSetting('hourHeight', 90);
+
+  store.wipeAll();
+  assert.equal(store.getState().blocks.length, 0);
+  assert.equal(store.getState().weekTasks.length, 0);
+  assert.equal(store.getState().settings.hourHeight, 90, 'Einstellungen bleiben erhalten');
+
+  store.restoreBackup();
+  assert.equal(store.getState().blocks[0].title, 'Wichtig');
+  assert.equal(store.getState().weekTasks[0].title, 'Nicht vergessen');
 });
 
 test('Sicherung ohne vorhandene Daten wird nicht angelegt', () => {

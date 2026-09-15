@@ -370,22 +370,28 @@ async function main() {
     (await cdp.eval(`document.querySelectorAll('.block.done').length`)) > 0);
 
   // --- Session auf einem Einzelblock (dort wandert der Ankertag mit) ---
+  // Über die Oberfläche anlegen: localStorage von außen zu setzen greift nicht mehr,
+  // seit die App beim Verlassen der Seite ihren eigenen Stand sichert.
   await cdp.eval(`(() => {
-    const grid = document.getElementById('columns');
     const col = document.querySelectorAll('.col')[1];
-    const view = document.getElementById('grid-scroll').getBoundingClientRect();
     const r = col.getBoundingClientRect();
-    window.__single = { x: r.left + r.width / 2, y: view.top + view.height - 60 };
+    const view = document.getElementById('grid-scroll').getBoundingClientRect();
+    const y = view.bottom - 40;
+    const opts = { bubbles: true, clientX: r.left + r.width / 2, clientY: y, pointerId: 3, pointerType: 'mouse', isPrimary: true, button: 0 };
+    col.dispatchEvent(new PointerEvent('pointerdown', opts));
+    document.dispatchEvent(new PointerEvent('pointerup', opts));
   })()`);
+  await sleep(300);
   await cdp.eval(`(() => {
-    const s = JSON.parse(localStorage.getItem('tagwerk.state.v1'));
-    s.blocks.push({ id: 'einzel1', title: 'Einzeltermin', color: 'rot', notes: '',
-      date: document.querySelectorAll('.col')[1].dataset.date, start: 21 * 60, duration: 30,
-      todos: [], recur: null, done: false, createdAt: Date.now() });
-    localStorage.setItem('tagwerk.state.v1', JSON.stringify(s));
+    const input = document.querySelector('#sheet input[type="text"]');
+    input.value = 'Einzeltermin';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector('#sheet .btn.primary').click();
   })()`);
-  await goto('about:blank');
-  await goto(`http://127.0.0.1:${PORT}/`);
+  await sleep(300);
+  check('Klick ins leere Raster legt einen Einzelblock an',
+    await cdp.eval(`[...document.querySelectorAll('.block')].some(n => n._occ.title === 'Einzeltermin' && !n._occ.isRecurring)`));
+
   await cdp.eval(`(() => {
     const b = [...document.querySelectorAll('.block')].find(n => n._occ.title === 'Einzeltermin');
     const r = b.getBoundingClientRect();
@@ -394,12 +400,21 @@ async function main() {
   await sleep(150);
   await cdp.eval(`[...document.querySelectorAll('#menu button')].find(b => b.textContent.includes('Fokus-Session')).click()`);
   await sleep(300);
-  await cdp.eval(`(() => {
+  const singleBefore = await cdp.eval(`(() => {
     const b = [...document.querySelectorAll('.block')].find(n => n._occ.title === 'Einzeltermin');
     b.focus();
+    const date = b._occ.date;
     b.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+    return date;
   })()`);
   await sleep(600);
+  const singleAfter = await cdp.eval(`(() => {
+    const b = [...document.querySelectorAll('.block')].find(n => n._occ.title === 'Einzeltermin');
+    return b ? { date: b._occ.date, focused: document.activeElement === b } : null;
+  })()`);
+  check('Einzelblock wechselt per Tastatur den Tag', singleAfter && singleAfter.date !== singleBefore,
+    `${singleBefore} → ${singleAfter && singleAfter.date}`);
+  check('Fokus bleibt am verschobenen Einzelblock', !!singleAfter && singleAfter.focused);
   check('Session bleibt auch bei einem verschobenen Einzelblock bestehen',
     (await cdp.eval(`!document.getElementById('focus').hidden`)) &&
     (await cdp.eval(`document.querySelector('.focus-title')?.textContent`)) === 'Einzeltermin');
@@ -465,16 +480,27 @@ async function main() {
     (await cdp.eval(`document.querySelectorAll('.block').length`)) > 5 &&
     (await cdp.eval(`document.querySelectorAll('#list-weektasks li').length`)) === 1);
 
-  // --- Alles löschen und aus der Sicherung zurückholen ---
+  // --- Alles löschen, leerer Zustand, Sicherung zurückholen ---
   const blocksBeforeWipe = await cdp.eval(`JSON.parse(localStorage.getItem('tagwerk.state.v1')).blocks.length`);
   await cdp.eval(`document.getElementById('btn-menu').click()`);
   await sleep(120);
   await cdp.eval(`[...document.querySelectorAll('#menu button')].find(b => b.textContent.includes('Alle Daten löschen')).click()`);
   await sleep(200);
   await cdp.eval(`[...document.querySelectorAll('#sheet .btn')].find(b => b.textContent.includes('Ja, alles löschen')).click()`);
-  await sleep(900);
+  await sleep(400);
   check('Alles löschen räumt auf',
     (await cdp.eval(`document.querySelectorAll('.block').length`)) === 0);
+  check('Löschen bleibt auch nach dem Neuladen gelöscht',
+    (await cdp.eval(`JSON.parse(localStorage.getItem('tagwerk.state.v1')).blocks.length`)) === 0);
+  check('Leerer Zustand erklärt den Einstieg',
+    await cdp.eval(`!document.getElementById('empty-state').hidden`));
+
+  await cdp.eval(`document.getElementById('btn-empty-demo').click()`);
+  await sleep(300);
+  check('Beispielwoche aus dem leeren Zustand',
+    (await cdp.eval(`document.querySelectorAll('.block').length`)) > 10 &&
+    (await cdp.eval(`document.getElementById('empty-state').hidden`)));
+
   await cdp.eval(`document.getElementById('btn-menu').click()`);
   await sleep(150);
   check('Sicherung wird im Menü angeboten',
@@ -483,21 +509,9 @@ async function main() {
   await sleep(200);
   await cdp.eval(`[...document.querySelectorAll('#sheet .btn')].find(b => b.textContent === 'Zurückholen').click()`);
   await sleep(350);
-  check('Sicherung stellt die Blöcke wieder her',
-    (await cdp.eval(`document.querySelectorAll('.block').length`)) > 0,
-    `vorher ${blocksBeforeWipe} Blöcke`);
-
-  // --- Leerer Zustand ---
-  await cdp.eval(`localStorage.clear()`);
-  await goto('about:blank');
-  await goto(`http://127.0.0.1:${PORT}/`);
-  check('Leerer Zustand erklärt den Einstieg',
-    await cdp.eval(`!document.getElementById('empty-state').hidden`));
-  await cdp.eval(`document.getElementById('btn-empty-demo').click()`);
-  await sleep(300);
-  check('Beispielwoche aus dem leeren Zustand',
-    (await cdp.eval(`document.querySelectorAll('.block').length`)) > 10 &&
-    (await cdp.eval(`document.getElementById('empty-state').hidden`)));
+  check('Sicherung stellt den alten Stand wieder her',
+    (await cdp.eval(`JSON.parse(localStorage.getItem('tagwerk.state.v1')).blocks.length`)) === blocksBeforeWipe,
+    `${blocksBeforeWipe} Blöcke erwartet`);
 
   // --- Tagesansicht + Mobil ---
   await setViewport(390, 844, true);

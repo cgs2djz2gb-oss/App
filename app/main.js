@@ -5,7 +5,7 @@ import {
 import {
   load, getState, setSetting, undo, redo, exportJson, importJson, createBlock, uid,
   COLORS, patchOccurrence, deleteOccurrence, saveBackup, getBackupInfo, restoreBackup,
-  categoryName, setCategoryName, setCategoryGoal,
+  categoryName, setCategoryName, setCategoryGoal, flush, wipeAll,
 } from './store.js';
 import { initGrid, renderPlanner } from './grid.js';
 import { initPanels, renderPanels } from './panels.js';
@@ -329,9 +329,9 @@ async function wipe() {
     { label: 'Ja, alles löschen', value: 'yes', danger: true },
   ], { text: 'Blöcke, Aufgaben und To-dos auf diesem Gerät werden entfernt. Eine Kopie wird beiseitegelegt – über das Menü lässt sie sich zurückholen.' });
   if (ok !== 'yes') return;
-  saveBackup('vor dem Löschen aller Daten');
-  localStorage.removeItem('tagwerk.state.v1');
-  location.reload();
+  wipeAll();
+  app.refresh();
+  toast('Alle Daten gelöscht', { label: 'Doch nicht', onClick: doRestore });
 }
 
 function showHelp() {
@@ -405,7 +405,9 @@ function wire() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { closeMenu(); closeSheet(); return; }
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+    // Beim Tippen gehört ⌘Z dem Textfeld, und hinter einem offenen Dialog
+    // würde es an Daten drehen, die der Dialog gerade bearbeitet.
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !typing && !isSheetOpen()) {
       e.preventDefault();
       if (e.shiftKey) redo(); else undo();
       app.refresh();
@@ -431,6 +433,13 @@ function wire() {
   }, 60000);
 
   window.addEventListener('resize', () => app.refresh());
+
+  // Wird die Seite geschlossen oder die App weggewischt, sofort schreiben
+  // statt auf den Entprell-Timer zu warten.
+  window.addEventListener('pagehide', flush);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flush();
+  });
 }
 
 applyTheme();

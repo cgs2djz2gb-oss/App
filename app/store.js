@@ -1,5 +1,5 @@
 // Zustand + Persistenz (localStorage). Alles läuft lokal auf dem Gerät.
-import { todayYmd, weekKey } from './dates.js';
+import { todayYmd, weekKey, dowOf, startOfWeek, addDays } from './dates.js';
 
 const KEY = 'tagwerk.state.v1';
 const BACKUP_KEY = 'tagwerk.backup.v1';
@@ -128,6 +128,16 @@ function persist() {
   }, 120);
 }
 
+/** Ausstehende Speicherung sofort ausführen (beim Verlassen der Seite). */
+export function flush() {
+  clearTimeout(saveTimer);
+  try {
+    localStorage.setItem(KEY, JSON.stringify(state));
+  } catch (err) {
+    console.warn('Speichern fehlgeschlagen:', err);
+  }
+}
+
 const snapshot = () => JSON.parse(JSON.stringify(state));
 
 /** Zustand ändern. `fn` bekommt eine Kopie und darf sie mutieren. */
@@ -153,10 +163,15 @@ export function setSetting(key, value) {
 
 export function canUndo() { return undoStack.length > 0; }
 
+/** Ansicht, Zoom, Thema und die laufende Session bleiben von Undo unberührt. */
+function withCurrentEnvironment(older) {
+  return { ...older, settings: state.settings, session: state.session };
+}
+
 export function undo() {
   if (!undoStack.length) return false;
   redoStack.push(snapshot());
-  state = undoStack.pop();
+  state = withCurrentEnvironment(undoStack.pop());
   persist();
   notify();
   return true;
@@ -165,7 +180,7 @@ export function undo() {
 export function redo() {
   if (!redoStack.length) return false;
   undoStack.push(snapshot());
-  state = redoStack.pop();
+  state = withCurrentEnvironment(redoStack.pop());
   persist();
   notify();
   return true;
@@ -224,9 +239,14 @@ export function moveOccurrence(blockId, fromDate, toDate, start, scope = 'single
       return;
     }
     if (scope === 'series') {
-      const shift = new Date(toDate).getDay() - new Date(fromDate).getDay();
+      const shift = dowOf(toDate) - dowOf(fromDate);
       if (shift !== 0 && block.recur.weekdays.length) {
         block.recur.weekdays = block.recur.weekdays.map((d) => (d + shift + 7) % 7).sort();
+        // Der Serienstart muss auf den neuen Wochentag rutschen - sonst liegt er
+        // hinter dem ersten Termin und die laufende Woche fällt heraus.
+        const weekStartsOn = s.settings.weekStartsOn;
+        const anchorWeek = startOfWeek(block.date, weekStartsOn);
+        block.date = addDays(anchorWeek, (dowOf(toDate) - weekStartsOn + 7) % 7);
       }
       block.start = start;
       for (const k of Object.keys(s.overrides)) {
@@ -416,6 +436,21 @@ export function saveBackup(reason) {
     console.warn('Sicherung fehlgeschlagen:', err);
     return false;
   }
+}
+
+/**
+ * Alle Daten löschen. Muss über den Zustand laufen und nicht nur über den
+ * Speicher: beim folgenden Neuladen schreibt die App ihren Stand sonst
+ * einfach wieder zurück.
+ */
+export function wipeAll() {
+  saveBackup('vor dem Löschen aller Daten');
+  const keep = state.settings;
+  state = { ...defaultState(), settings: keep };
+  undoStack = [];
+  redoStack = [];
+  flush();
+  notify();
 }
 
 export function getBackupInfo() {

@@ -118,8 +118,8 @@ Jeder Static-Hoster genügt, die App braucht keinen Build-Schritt.
 
 ```bash
 npm run dev          # http://localhost:4173
-npm test             # 25 Logiktests (Serien, Datum, Vorlagen, Übertragung, Sicherung, Speicher)
-npm run test:browser # 51 End-to-End-Checks im echten Chromium (Ziehen, Tastatur, Kontextmenü,
+npm test             # 29 Logiktests (Serien, Datum, Vorlagen, Übertragung, Sicherung, Speicher)
+npm run test:browser # 58 End-to-End-Checks im echten Chromium (Ziehen, Tastatur, Kontextmenü,
                      # Fokus-Session, Vorlagen, Übertragung, Sicherung, Kategorien,
                      # Druckansicht, Mobil, Dunkelmodus)
 ```

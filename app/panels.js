@@ -1,5 +1,7 @@
 // Seitenleiste: Wochenaufgaben, Tages-To-dos, Überblick.
-import { weekKey, addDays, fmtDateShort, fmtHours, DOW_SHORT, dowOf, fmtDateLong, todayYmd } from './dates.js';
+import {
+  weekKey, addDays, fmtDateShort, fmtHours, DOW_SHORT, dowOf, fmtDateLong, todayYmd, nowMinutes,
+} from './dates.js';
 import {
   getState, addWeekTask, updateWeekTask, removeWeekTask, carryOverWeekTasks,
   addDayTodo, updateDayTodo, removeDayTodo, categoryName, COLORS,
@@ -124,7 +126,10 @@ function scheduleTask(title) {
   const occs = occurrencesByDate(state, date, date).get(date) || [];
   const dayStart = state.settings.dayStart * 60;
   const dayEnd = state.settings.dayEnd * 60;
-  const now = date === todayYmd() ? Math.max(dayStart, Math.floor(new Date().getHours() * 60 / 15) * 15) : dayStart + 120;
+  const snap = state.settings.snap;
+  const now = date === todayYmd()
+    ? Math.max(dayStart, Math.floor(nowMinutes() / snap) * snap)
+    : dayStart + 120;
   const start = findFreeSlot(occs, Math.min(now, dayEnd - 60), 60, dayEnd);
   app.openEditor(null, { date, start, duration: 60, title });
 }
@@ -213,7 +218,6 @@ function renderStats() {
 
 /** Wochenstunden nach Farbe/Kategorie aufgeschlüsselt. */
 function categoryRows(weekOccs, weekMinutes) {
-  if (!weekOccs.length) return [];
   const byColor = new Map();
   for (const o of weekOccs) {
     const entry = byColor.get(o.color) || { planned: 0, done: 0 };
@@ -222,10 +226,12 @@ function categoryRows(weekOccs, weekMinutes) {
     byColor.set(o.color, entry);
   }
   const goals = getState().settings.goals || {};
-  // Kategorien mit Ziel tauchen auch dann auf, wenn noch nichts geplant ist.
+  // Kategorien mit Ziel tauchen auch dann auf, wenn noch nichts geplant ist –
+  // gerade dann will man ja sehen, dass noch nichts steht.
   for (const color of Object.keys(goals)) {
     if (!byColor.has(color)) byColor.set(color, { planned: 0, done: 0 });
   }
+  if (!byColor.size) return [];
 
   const rows = [...byColor.entries()]
     .sort((a, b) => b[1].planned - a[1].planned)

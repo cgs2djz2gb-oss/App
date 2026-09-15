@@ -1,14 +1,15 @@
 // Zeitraster: Rendering der Tages-/Wochenansicht plus Ziehen, Größe ändern, Anlegen.
 import { addDays, dowOf, fmtTime, todayYmd, nowMinutes, DOW_SHORT, fmtHours, parseYmd } from './dates.js';
 import { occurrencesByDate, layoutDay, plannedMinutes } from './recurrence.js';
-import { getState, moveOccurrence, patchOccurrence, deleteOccurrence } from './store.js';
+import { getState, moveOccurrence, patchOccurrence, deleteOccurrence, ovKey } from './store.js';
 import { toast, el } from './ui.js';
 
 let app = null;               // wird von main.js gesetzt
 let buckets = new Map();
 let nowTimer = null;
 let didInitialScroll = false;
-let focusedKey = null;   // Block, der zuletzt die Tastatur hatte
+let focusedKey = null;      // Block, der zuletzt die Tastatur hatte
+let pendingFocusKey = null; // Schlüssel, den der Block nach der Änderung trägt
 
 export function initGrid(appRef) {
   app = appRef;
@@ -45,7 +46,12 @@ export function renderPlanner() {
   // Vor dem Neuaufbau merken, welcher Block die Tastatur hat - das Entfernen
   // der alten Elemente löst sonst ein blur aus und der Fokus wäre weg.
   const active = document.activeElement;
-  if (active && active.classList && active.classList.contains('block')) focusedKey = active.dataset.key;
+  if (pendingFocusKey) {
+    focusedKey = pendingFocusKey;
+    pendingFocusKey = null;
+  } else if (active && active.classList && active.classList.contains('block')) {
+    focusedKey = active.dataset.key;
+  }
   buckets = occurrencesByDate(state, dates[0], dates[dates.length - 1]);
 
   document.documentElement.style.setProperty('--hour-h', `${hourH()}px`);
@@ -173,8 +179,13 @@ function onBlockKeydown(e) {
   const step = e.altKey ? 5 : settings().snap;
 
   const moveTo = (start, date = occ.date) => {
-    if (occ.isRecurring) moveOccurrence(occ.blockId, occ.anchorDate, date, start, 'single');
-    else patchOccurrence(occ.blockId, occ.date, { start, date }, 'series');
+    if (occ.isRecurring) {
+      moveOccurrence(occ.blockId, occ.anchorDate, date, start, 'single');
+    } else {
+      patchOccurrence(occ.blockId, occ.date, { start, date }, 'series');
+      // Bei Einzelblöcken ist der Tag Teil des Schlüssels – sonst wäre der Fokus weg.
+      pendingFocusKey = ovKey(occ.blockId, date);
+    }
     app.refresh();
   };
   const resizeTo = (duration) => {
@@ -292,6 +303,7 @@ function startBlockGesture(e, node, mode) {
   const orig = { start: occ.start, duration: occ.duration, date: occ.date };
   let active = !touch && mode !== 'move';   // Anfasser starten sofort
   let moved = false;
+  let panned = false;                      // mit dem Finger gescrollt statt gezogen
   let longPress = null;
   let next = { ...orig };
   let panLast = startY;
@@ -318,6 +330,7 @@ function startBlockGesture(e, node, mode) {
         if (Math.abs(dy) > 6 || Math.abs(dx) > 6) {
           clearTimeout(longPress);
           longPress = null;
+          panned = true;
           scroller.scrollTop -= ev.clientY - panLast;
           panLast = ev.clientY;
         }
@@ -365,7 +378,8 @@ function startBlockGesture(e, node, mode) {
     node.classList.remove('dragging');
 
     if (!active || !moved) {
-      if (!moved) app.openEditor(occ);
+      // Nach einem Wisch nur scrollen – der Editor gehört zum Tippen.
+      if (!moved && !panned) app.openEditor(occ);
       else app.refresh();
       return;
     }
