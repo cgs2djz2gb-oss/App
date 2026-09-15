@@ -478,6 +478,20 @@ async function main() {
   await sleep(200);
   await shot('05-aufgaben-mobil');
 
+  // --- Druckansicht ---
+  await setViewport(1280, 860);
+  await goto(`http://127.0.0.1:${PORT}/`);
+  await cdp.send('Emulation.setEmulatedMedia', { media: 'print' });
+  await sleep(300);
+  check('Druckansicht blendet Bedienelemente aus',
+    await cdp.eval(`getComputedStyle(document.querySelector('.side')).display === 'none' &&
+                    getComputedStyle(document.querySelector('.fab')).display === 'none' &&
+                    getComputedStyle(document.querySelector('.grid-scroll')).overflowY === 'visible'`));
+  check('Druck nutzt ein kompaktes Raster',
+    await cdp.eval(`getComputedStyle(document.documentElement).getPropertyValue('--hour-h').trim() === '34px'`));
+  await shot('10-druck');
+  await cdp.send('Emulation.setEmulatedMedia', { media: '' });
+
   // --- Dunkelmodus ---
   await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
   await setViewport(1280, 860);

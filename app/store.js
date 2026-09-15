@@ -29,6 +29,7 @@ export function defaultState() {
       theme: 'system',
       carryOverTodos: true,
       categories: {},     // Farbe -> eigener Name, z. B. { lila: 'Lernen' }
+      goals: {},          // Farbe -> Wochenziel in Stunden, z. B. { lila: 12 }
     },
     blocks: [],
     overrides: {},        // "blockId|YYYY-MM-DD" -> { deleted?, start?, duration?, title?, notes?, color?, done?, todoDone? }
@@ -53,6 +54,7 @@ function migrate(raw) {
       ...base.settings,
       ...(raw.settings || {}),
       categories: { ...(raw.settings?.categories || {}) },
+      goals: { ...(raw.settings?.goals || {}) },
     },
     blocks: Array.isArray(raw.blocks) ? raw.blocks.map(normalizeBlock) : [],
     overrides: raw.overrides && typeof raw.overrides === 'object' ? raw.overrides : {},
@@ -383,6 +385,16 @@ export function setCategoryName(color, name) {
     s.settings.categories = { ...(s.settings.categories || {}) };
     if (name && name.trim()) s.settings.categories[color] = name.trim();
     else delete s.settings.categories[color];
+  }, { undoable: false });
+}
+
+/** Wochenziel einer Kategorie in Stunden (0 = kein Ziel). */
+export function setCategoryGoal(color, hours) {
+  mutate((s) => {
+    s.settings.goals = { ...(s.settings.goals || {}) };
+    const h = Number(hours);
+    if (h > 0) s.settings.goals[color] = h;
+    else delete s.settings.goals[color];
   }, { undoable: false });
 }
 

@@ -221,19 +221,35 @@ function categoryRows(weekOccs, weekMinutes) {
     if (o.done) entry.done += o.duration;
     byColor.set(o.color, entry);
   }
+  const goals = getState().settings.goals || {};
+  // Kategorien mit Ziel tauchen auch dann auf, wenn noch nichts geplant ist.
+  for (const color of Object.keys(goals)) {
+    if (!byColor.has(color)) byColor.set(color, { planned: 0, done: 0 });
+  }
+
   const rows = [...byColor.entries()]
     .sort((a, b) => b[1].planned - a[1].planned)
-    .map(([color, v]) => el('div', {
-      class: 'cat-row',
-      title: `${fmtHours(v.done)} von ${fmtHours(v.planned)} erledigt`,
-    }, [
-      el('span', { class: 'cat-dot', style: `background:var(--c-${color})` }),
-      el('span', { class: 'cat-name', text: categoryName(color) }),
-      el('span', { class: 'cat-bar' }, [
-        el('i', { style: `width:${Math.round((v.planned / weekMinutes) * 100)}%;background:var(--c-${color})` }),
-      ]),
-      el('span', { class: 'cat-h', text: fmtHours(v.planned) }),
-    ]));
+    .map(([color, v]) => {
+      const goalH = goals[color] || 0;
+      const goalMin = goalH * 60;
+      const reached = goalMin > 0 && v.planned >= goalMin;
+      const share = goalMin > 0
+        ? Math.min(100, Math.round((v.planned / goalMin) * 100))
+        : Math.round((v.planned / Math.max(1, weekMinutes)) * 100);
+      return el('div', {
+        class: `cat-row ${reached ? 'reached' : ''}`,
+        title: goalMin
+          ? `${fmtHours(v.planned)} von ${goalH} h Wochenziel geplant, ${fmtHours(v.done)} erledigt`
+          : `${fmtHours(v.done)} von ${fmtHours(v.planned)} erledigt`,
+      }, [
+        el('span', { class: 'cat-dot', style: `background:var(--c-${color})` }),
+        el('span', { class: 'cat-name', text: categoryName(color) }),
+        el('span', { class: 'cat-bar' }, [
+          el('i', { style: `width:${share}%;background:var(--c-${color})` }),
+        ]),
+        el('span', { class: 'cat-h', text: goalMin ? `${fmtHours(v.planned)} / ${goalH} h` : fmtHours(v.planned) }),
+      ]);
+    });
 
   return [
     el('div', { class: 'cat-head' }, [

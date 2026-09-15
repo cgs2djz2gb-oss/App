@@ -5,7 +5,7 @@ import {
 import {
   load, getState, setSetting, undo, redo, exportJson, importJson, createBlock, uid,
   COLORS, patchOccurrence, deleteOccurrence, saveBackup, getBackupInfo, restoreBackup,
-  categoryName, setCategoryName,
+  categoryName, setCategoryName, setCategoryGoal,
 } from './store.js';
 import { initGrid, renderPlanner } from './grid.js';
 import { initPanels, renderPanels } from './panels.js';
@@ -112,6 +112,13 @@ function openCategorySheet() {
       oninput: (e) => { setCategoryName(c.id, e.target.value); },
       onchange: () => app.refresh(),
     }),
+    el('input', {
+      type: 'number', min: '0', step: '0.5', class: 'cat-goal',
+      value: getState().settings.goals?.[c.id] || '',
+      placeholder: 'h/Woche',
+      title: 'Wochenziel in Stunden (leer = kein Ziel)',
+      onchange: (e) => { setCategoryGoal(c.id, e.target.value); app.refresh(); },
+    }),
   ]));
 
   openSheet(el('div', {}, [
@@ -120,7 +127,7 @@ function openCategorySheet() {
       el('button', { class: 'btn primary', type: 'button', onclick: () => { closeSheet(); app.refresh(); } }, ['Fertig']),
     ]),
     el('div', { class: 'sheet-body' }, [
-      el('p', { class: 'hint', text: 'Gib den Farben Namen – zum Beispiel Lernen, Uni, Sport oder Nebenjob. Die Wochenauswertung zeigt dann, wie viele Stunden auf was entfallen.' }),
+      el('p', { class: 'hint', text: 'Gib den Farben Namen – zum Beispiel Lernen, Uni, Sport oder Nebenjob. Rechts lässt sich ein Wochenziel in Stunden setzen; der Überblick zeigt dann, wie weit die Woche davon entfernt ist.' }),
       el('div', { class: 'field' }, rows),
     ]),
   ]));
@@ -277,6 +284,7 @@ function openMainMenu(anchor) {
     { label: 'Daten sichern (JSON)', onClick: doExport },
     { label: 'Daten laden (JSON)', onClick: doImport },
     { label: 'Beispielwoche einfügen', onClick: seedDemo },
+    { label: 'Woche drucken…', onClick: () => { closeMenu(); setTimeout(() => window.print(), 60); } },
     '-',
     backup && {
       label: `Sicherung zurückholen (${backupLabel(backup)})`,

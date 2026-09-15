@@ -68,8 +68,14 @@ die App sucht dafür automatisch die nächste freie Lücke im Tag.
 - Auf dem Handy: waagerecht wischen blättert, senkrecht scrollt, Tippen legt an,
   langes Drücken auf einem Block startet das Verschieben
 
+**Überblick & Ziele**
+- Farben lassen sich benennen (Lernen, Uni, Sport, Nebenjob …) – die Woche wird danach aufgeschlüsselt
+- Optionales Wochenziel je Kategorie: „Lernen 10 / 12 h", erreicht wird mit ✓ markiert
+- Tagesbalken zeigen geplant und davon erledigt; ein Klick springt auf den Tag
+- Kennzahlen: Stunden heute, Stunden diese Woche, erledigte Blöcke, Anteil der Woche
+
 **Drumherum**
-- Überblick: geplante Stunden pro Tag/Woche, erledigte Blöcke, Balken über die Woche
+- Woche drucken (Menü ⋯) – eigenes Drucklayout im Querformat, ohne Bedienelemente
 - Rückgängig/Wiederherstellen (⌘Z / ⇧⌘Z)
 - Sicherung als JSON exportieren und importieren (auch zum Umzug aufs zweite Gerät)
 - Automatische Sicherheitskopie vor „alles löschen" und vor einem ersetzenden Import –
@@ -113,8 +119,9 @@ Jeder Static-Hoster genügt, die App braucht keinen Build-Schritt.
 ```bash
 npm run dev          # http://localhost:4173
 npm test             # 25 Logiktests (Serien, Datum, Vorlagen, Übertragung, Sicherung, Speicher)
-npm run test:browser # 46 End-to-End-Checks im echten Chromium (Ziehen, Tastatur, Kontextmenü,
-                     # Fokus-Session, Vorlagen, Übertragung, Sicherung, Mobil, Dunkelmodus)
+npm run test:browser # 51 End-to-End-Checks im echten Chromium (Ziehen, Tastatur, Kontextmenü,
+                     # Fokus-Session, Vorlagen, Übertragung, Sicherung, Kategorien,
+                     # Druckansicht, Mobil, Dunkelmodus)
 ```
 
 Node 22+, sonst nichts. **Null Abhängigkeiten** – kein Bundler, kein Framework,

@@ -300,6 +300,8 @@ input[type="checkbox"].cb:checked::after {
 .cat-h { font-variant-numeric: tabular-nums; color: var(--text-dim); min-width: 3rem; text-align: right; }
 .cat-edit { display: flex; align-items: center; gap: 10px; }
 .cat-edit input { flex: 1; }
+.cat-edit .cat-goal { flex: none; width: 6.5rem; }
+.cat-row.reached .cat-name::after { content: " ✓"; color: var(--c-gruen); }
 
 /* ---------- Sheet (editor) ---------- */
 .sheet-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 50; }
@@ -483,3 +485,33 @@ input[type="checkbox"].cb:checked::after {
 .tpl-row:last-child { border-bottom: 0; }
 .tpl-info { flex: 1; min-width: 0; }
 .tpl-name { font-weight: 600; }
+
+
+/* ---------- Drucken: die Woche aufs Papier ---------- */
+@media print {
+  @page { size: landscape; margin: 10mm; }
+  /* Die Zoomstufe steht als Inline-Variable am Wurzelelement - !important sticht sie für den Druck aus. */
+  :root { --hour-h: 34px !important; }
+  body { background: #fff; color: #000; }
+  .topbar {
+    position: static; border-bottom: 1px solid #999; padding: 0 0 6px;
+    background: none; backdrop-filter: none;
+  }
+  .icon-btn, .btn, .segmented, .zoom, .session-pill, .view-toggle,
+  .side, .tabbar, .fab, .toast-wrap, .menu, .sheet, .sheet-backdrop,
+  .empty-state, .handle, .nowline { display: none !important; }
+  .title-block h1 { font-size: 15pt; }
+  .sub { display: block; font-size: 9pt; color: #444; }
+  .app { height: auto; display: block; }
+  .main { display: block; }
+  .grid-scroll { overflow: visible; }
+  .grid, .grid-head { padding-left: 0; }
+  .col.weekend, .col.today-col { background: none; }
+  .head-cell.today .dnum { background: none; color: #000; border: 1px solid #000; }
+  .block {
+    box-shadow: none; border: 1px solid #666; border-left-width: 3px;
+    print-color-adjust: exact; -webkit-print-color-adjust: exact;
+  }
+  .block .b-meta { color: #333; }
+  .hline { border-color: #ddd; }
+}
