@@ -276,8 +276,30 @@ input[type="checkbox"].cb:checked::after {
 .stat .k { font-size: 11px; color: var(--text-dim); }
 .bars { grid-column: 1 / -1; display: flex; align-items: flex-end; gap: 5px; height: 62px; padding-top: 6px; }
 .bars .bar { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; gap: 3px; }
-.bars .bar i { display: block; background: var(--accent); border-radius: 3px; min-height: 2px; opacity: .8; }
+.bars .bar { cursor: pointer; }
+.bars .bar i {
+  display: flex; flex-direction: column; justify-content: flex-end;
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  border-radius: 4px; min-height: 3px; overflow: hidden;
+}
+.bars .bar i u { display: block; background: var(--accent); border-radius: 0 0 4px 4px; }
+.bars .bar.sel b { color: var(--text); font-weight: 640; }
 .bars .bar b { font-size: 9px; text-align: center; color: var(--text-faint); font-weight: 500; }
+
+.cat-head {
+  grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--text-dim); font-weight: 640; margin-top: 4px;
+}
+.cat-head .link-btn { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.cat-row { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.cat-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.cat-name { flex: none; min-width: 5.5rem; color: var(--text-dim); }
+.cat-bar { flex: 1; height: 6px; background: var(--bg-sunken); border-radius: 999px; overflow: hidden; }
+.cat-bar i { display: block; height: 100%; border-radius: 999px; opacity: .85; }
+.cat-h { font-variant-numeric: tabular-nums; color: var(--text-dim); min-width: 3rem; text-align: right; }
+.cat-edit { display: flex; align-items: center; gap: 10px; }
+.cat-edit input { flex: 1; }
 
 /* ---------- Sheet (editor) ---------- */
 .sheet-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 50; }

@@ -28,6 +28,7 @@ export function defaultState() {
       view: 'week',
       theme: 'system',
       carryOverTodos: true,
+      categories: {},     // Farbe -> eigener Name, z. B. { lila: 'Lernen' }
     },
     blocks: [],
     overrides: {},        // "blockId|YYYY-MM-DD" -> { deleted?, start?, duration?, title?, notes?, color?, done?, todoDone? }
@@ -48,7 +49,11 @@ function migrate(raw) {
     ...base,
     ...raw,
     version: 1,
-    settings: { ...base.settings, ...(raw.settings || {}) },
+    settings: {
+      ...base.settings,
+      ...(raw.settings || {}),
+      categories: { ...(raw.settings?.categories || {}) },
+    },
     blocks: Array.isArray(raw.blocks) ? raw.blocks.map(normalizeBlock) : [],
     overrides: raw.overrides && typeof raw.overrides === 'object' ? raw.overrides : {},
     weekTasks: Array.isArray(raw.weekTasks) ? raw.weekTasks : [],
@@ -364,6 +369,21 @@ export function clearOccurrences(occs) {
     }
     s.blocks = s.blocks.filter((b) => !singles.has(b.id));
   });
+}
+
+/** Anzeigename einer Farbe: eigener Name, sonst die Farbbezeichnung. */
+export function categoryName(color) {
+  const own = state.settings.categories?.[color];
+  if (own && own.trim()) return own.trim();
+  return (COLORS.find((c) => c.id === color) || { label: color }).label;
+}
+
+export function setCategoryName(color, name) {
+  mutate((s) => {
+    s.settings.categories = { ...(s.settings.categories || {}) };
+    if (name && name.trim()) s.settings.categories[color] = name.trim();
+    else delete s.settings.categories[color];
+  }, { undoable: false });
 }
 
 // ---------- Sicherheitsnetz ----------

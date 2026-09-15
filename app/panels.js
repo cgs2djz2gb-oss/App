@@ -2,9 +2,9 @@
 import { weekKey, addDays, fmtDateShort, fmtHours, DOW_SHORT, dowOf, fmtDateLong, todayYmd } from './dates.js';
 import {
   getState, addWeekTask, updateWeekTask, removeWeekTask, carryOverWeekTasks,
-  addDayTodo, updateDayTodo, removeDayTodo,
+  addDayTodo, updateDayTodo, removeDayTodo, categoryName, COLORS,
 } from './store.js';
-import { occurrencesByDate, plannedMinutes, findFreeSlot } from './recurrence.js';
+import { occurrencesByDate, plannedMinutes, doneMinutes, findFreeSlot } from './recurrence.js';
 import { timeAtPoint, showDropPreview, clearDropPreview } from './grid.js';
 import { el, toast } from './ui.js';
 
@@ -176,15 +176,24 @@ function renderStats() {
   const buckets = occurrencesByDate(state, start, end);
   const todayOccs = buckets.get(app.cursor) || occurrencesByDate(state, app.cursor, app.cursor).get(app.cursor) || [];
 
-  const weekMinutes = [...buckets.values()].reduce((sum, list) => sum + plannedMinutes(list), 0);
+  const weekOccs = [...buckets.values()].flat();
+  const weekMinutes = plannedMinutes(weekOccs);
+  const weekDone = doneMinutes(weekOccs);
   const dayMinutes = plannedMinutes(todayOccs);
   const doneCount = todayOccs.filter((o) => o.done).length;
   const max = Math.max(60, ...[...buckets.values()].map((l) => plannedMinutes(l)));
 
   const bars = el('div', { class: 'bars' }, [...buckets.entries()].map(([date, list]) => {
-    const m = plannedMinutes(list);
-    return el('div', { class: 'bar', title: `${fmtDateShort(date)}: ${fmtHours(m)}` }, [
-      el('i', { style: `height:${Math.round((m / max) * 100)}%` }),
+    const planned = plannedMinutes(list);
+    const done = doneMinutes(list);
+    return el('div', {
+      class: `bar ${date === app.cursor ? 'sel' : ''}`,
+      title: `${fmtDateShort(date)}: ${fmtHours(planned)} geplant, davon ${fmtHours(done)} erledigt`,
+      onclick: () => app.goToDate(date),
+    }, [
+      el('i', { style: `height:${Math.round((planned / max) * 100)}%` }, [
+        el('u', { style: `height:${planned ? Math.round((done / planned) * 100) : 0}%` }),
+      ]),
       el('b', { text: DOW_SHORT[dowOf(date)] }),
     ]);
   }));
@@ -192,8 +201,45 @@ function renderStats() {
   document.getElementById('stats').replaceChildren(
     el('div', { class: 'stat' }, [el('div', { class: 'v', text: fmtHours(dayMinutes) }), el('div', { class: 'k', text: 'geplant am Tag' })]),
     el('div', { class: 'stat' }, [el('div', { class: 'v', text: fmtHours(weekMinutes) }), el('div', { class: 'k', text: 'geplant in der Woche' })]),
-    el('div', { class: 'stat' }, [el('div', { class: 'v', text: `${doneCount}/${todayOccs.length}` }), el('div', { class: 'k', text: 'Blöcke erledigt' })]),
-    el('div', { class: 'stat' }, [el('div', { class: 'v', text: String(state.weekTasks.filter((t) => t.weekKey === weekKey(app.cursor) && !t.done).length) }), el('div', { class: 'k', text: 'offene Wochenaufgaben' })]),
+    el('div', { class: 'stat' }, [el('div', { class: 'v', text: `${doneCount}/${todayOccs.length}` }), el('div', { class: 'k', text: 'Blöcke heute erledigt' })]),
+    el('div', { class: 'stat' }, [
+      el('div', { class: 'v', text: weekMinutes ? `${Math.round((weekDone / weekMinutes) * 100)} %` : '–' }),
+      el('div', { class: 'k', text: 'der Woche geschafft' }),
+    ]),
     bars,
+    ...categoryRows(weekOccs, weekMinutes),
   );
+}
+
+/** Wochenstunden nach Farbe/Kategorie aufgeschlüsselt. */
+function categoryRows(weekOccs, weekMinutes) {
+  if (!weekOccs.length) return [];
+  const byColor = new Map();
+  for (const o of weekOccs) {
+    const entry = byColor.get(o.color) || { planned: 0, done: 0 };
+    entry.planned += o.duration;
+    if (o.done) entry.done += o.duration;
+    byColor.set(o.color, entry);
+  }
+  const rows = [...byColor.entries()]
+    .sort((a, b) => b[1].planned - a[1].planned)
+    .map(([color, v]) => el('div', {
+      class: 'cat-row',
+      title: `${fmtHours(v.done)} von ${fmtHours(v.planned)} erledigt`,
+    }, [
+      el('span', { class: 'cat-dot', style: `background:var(--c-${color})` }),
+      el('span', { class: 'cat-name', text: categoryName(color) }),
+      el('span', { class: 'cat-bar' }, [
+        el('i', { style: `width:${Math.round((v.planned / weekMinutes) * 100)}%;background:var(--c-${color})` }),
+      ]),
+      el('span', { class: 'cat-h', text: fmtHours(v.planned) }),
+    ]));
+
+  return [
+    el('div', { class: 'cat-head' }, [
+      el('span', { text: 'Woche nach Kategorie' }),
+      el('button', { class: 'link-btn', style: 'padding:0', onclick: () => app.openCategories() }, ['benennen']),
+    ]),
+    ...rows,
+  ];
 }

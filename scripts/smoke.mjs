@@ -231,6 +231,26 @@ async function main() {
   check('Duplizieren legt einen Block an',
     (await cdp.eval(`document.querySelectorAll('.block').length`)) === blocksBeforeDup + 1);
 
+  // --- Auswertung nach Kategorie ---
+  check('Woche nach Kategorie wird aufgeschlüsselt',
+    (await cdp.eval(`document.querySelectorAll('.cat-row').length`)) >= 3);
+  check('Tagesbalken zeigen den erledigten Anteil',
+    await cdp.eval(`!!document.querySelector('.bars .bar i u')`));
+  await cdp.eval(`document.getElementById('btn-menu').click()`);
+  await sleep(120);
+  await cdp.eval(`[...document.querySelectorAll('#menu button')].find(b => b.textContent.includes('Kategorien')).click()`);
+  await sleep(200);
+  await cdp.eval(`(() => {
+    const input = document.querySelector('#sheet .cat-edit input');
+    input.value = 'Lernen';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    document.querySelector('#sheet .btn.primary').click();
+  })()`);
+  await sleep(250);
+  check('Kategoriename erscheint in der Auswertung',
+    await cdp.eval(`[...document.querySelectorAll('.cat-name')].some(n => n.textContent === 'Lernen')`));
+
   // --- Tastaturbedienung ---
   const kb = await cdp.eval(pickVisible);
   const press = async (key, opts = {}) => {

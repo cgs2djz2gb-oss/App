@@ -5,6 +5,7 @@ import {
 import {
   load, getState, setSetting, undo, redo, exportJson, importJson, createBlock, uid,
   COLORS, patchOccurrence, deleteOccurrence, saveBackup, getBackupInfo, restoreBackup,
+  categoryName, setCategoryName,
 } from './store.js';
 import { initGrid, renderPlanner } from './grid.js';
 import { initPanels, renderPanels } from './panels.js';
@@ -12,7 +13,7 @@ import { openBlockEditor } from './editor.js';
 import { openTemplateSheet } from './templates.js';
 import { openTransferSheet, checkIncomingTransfer } from './transfer.js';
 import { initSession, startSession, openFocus, renderPill } from './session.js';
-import { el, openMenu, closeMenu, closeSheet, isSheetOpen, toast, choose } from './ui.js';
+import { el, openMenu, closeMenu, openSheet, closeSheet, isSheetOpen, toast, choose } from './ui.js';
 
 load();
 
@@ -37,6 +38,9 @@ export const app = {
   },
   step(dir) {
     step(dir);
+  },
+  openCategories() {
+    openCategorySheet();
   },
   refresh() {
     renderHeader();
@@ -93,6 +97,33 @@ function newBlockHere() {
   const raw = isToday ? now.getHours() * 60 + now.getMinutes() : s.dayStart * 60 + 120;
   const start = Math.min(Math.round(raw / s.snap) * s.snap, s.dayEnd * 60 - 60);
   app.openEditor(null, { date: app.cursor, start: Math.max(start, s.dayStart * 60), duration: 60 });
+}
+
+// ---------- Kategorien ----------
+
+/** Farben Namen geben – daraus wird die Wochenauswertung lesbar. */
+function openCategorySheet() {
+  const rows = COLORS.map((c) => el('div', { class: 'cat-edit' }, [
+    el('span', { class: 'cat-dot', style: `background:var(--c-${c.id});width:14px;height:14px` }),
+    el('input', {
+      type: 'text',
+      value: getState().settings.categories?.[c.id] || '',
+      placeholder: c.label,
+      oninput: (e) => { setCategoryName(c.id, e.target.value); },
+      onchange: () => app.refresh(),
+    }),
+  ]));
+
+  openSheet(el('div', {}, [
+    el('div', { class: 'sheet-head' }, [
+      el('h2', { text: 'Kategorien benennen' }),
+      el('button', { class: 'btn primary', type: 'button', onclick: () => { closeSheet(); app.refresh(); } }, ['Fertig']),
+    ]),
+    el('div', { class: 'sheet-body' }, [
+      el('p', { class: 'hint', text: 'Gib den Farben Namen – zum Beispiel Lernen, Uni, Sport oder Nebenjob. Die Wochenauswertung zeigt dann, wie viele Stunden auf was entfallen.' }),
+      el('div', { class: 'field' }, rows),
+    ]),
+  ]));
 }
 
 // ---------- Kontextmenü auf einem Block ----------
@@ -239,6 +270,7 @@ function openMainMenu(anchor) {
     { type: 'custom', node: weekendSetting() },
     { type: 'custom', node: themeSetting() },
     '-',
+    { label: 'Kategorien benennen…', onClick: openCategorySheet },
     { label: 'Wochen-Vorlagen…', onClick: () => openTemplateSheet(app) },
     { label: 'Auf anderes Gerät übertragen…', onClick: openTransferSheet },
     '-',

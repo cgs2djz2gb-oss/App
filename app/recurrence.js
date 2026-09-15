@@ -115,6 +115,11 @@ export function plannedMinutes(occs) {
   return occs.reduce((sum, o) => sum + o.duration, 0);
 }
 
+/** Davon als erledigt markierte Minuten. */
+export function doneMinutes(occs) {
+  return occs.reduce((sum, o) => sum + (o.done ? o.duration : 0), 0);
+}
+
 /** Nächster freier Slot an einem Tag, ab `fromMin`. */
 export function findFreeSlot(occs, fromMin, duration, dayEndMin) {
   const sorted = [...occs].sort((a, b) => a.start - b.start);
