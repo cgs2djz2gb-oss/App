@@ -388,3 +388,33 @@ function startCreateGesture(e) {
 export function getBuckets() {
   return buckets;
 }
+
+// ---------- Ablegen aus der Seitenleiste ----------
+
+/** Tag und (gerastete) Uhrzeit an einer Bildschirmposition. */
+export function timeAtPoint(clientX, clientY) {
+  const col = document.elementFromPoint(clientX, clientY)?.closest('.col');
+  if (!col) return null;
+  const rect = col.getBoundingClientRect();
+  const raw = yToMin(clientY - rect.top);
+  const start = clamp(snapMin(raw), dayStartMin(), dayEndMin() - settings().snap);
+  return { date: col.dataset.date, start, col };
+}
+
+let preview = null;
+
+export function showDropPreview(spot, duration = 60) {
+  clearDropPreview();
+  if (!spot) return;
+  preview = el('div', {
+    class: 'block ghost drop',
+    style: `--bg-c:var(--c-blau-bg);--fg-c:var(--c-blau);left:2px;width:calc(100% - 4px);` +
+           `top:${minToY(spot.start)}px;height:${Math.max(duration * pxPerMin(), 17)}px`,
+  }, [el('div', { class: 'b-meta', text: `${fmtTime(spot.start)}–${fmtTime(spot.start + duration)}` })]);
+  spot.col.append(preview);
+}
+
+export function clearDropPreview() {
+  if (preview) preview.remove();
+  preview = null;
+}

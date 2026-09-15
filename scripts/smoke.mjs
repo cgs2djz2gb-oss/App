@@ -231,6 +231,32 @@ async function main() {
   check('Duplizieren legt einen Block an',
     (await cdp.eval(`document.querySelectorAll('.block').length`)) === blocksBeforeDup + 1);
 
+  // --- Aufgabe in den Kalender ziehen ---
+  const droppedTitle = 'Übungsblatt 3 abgeben';
+  const dragResult = await cdp.eval(`(() => {
+    const row = [...document.querySelectorAll('#list-weektasks li')].find(li => li.textContent.includes(${JSON.stringify(droppedTitle)}));
+    if (!row) return 'keine Aufgabe';
+    const col = [...document.querySelectorAll('.col')][2];
+    const r = col.getBoundingClientRect();
+    const view = document.getElementById('grid-scroll').getBoundingClientRect();
+    const x = r.left + r.width / 2;
+    const y = view.top + view.height / 2;   // sichtbarer Bereich, sonst greift elementFromPoint daneben
+    const dt = new DataTransfer();
+    row.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
+    document.getElementById('columns').dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt, clientX: x, clientY: y }));
+    const preview = !!document.querySelector('.block.ghost.drop');
+    document.getElementById('columns').dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt, clientX: x, clientY: y }));
+    return { preview, date: col.dataset.date };
+  })()`);
+  await sleep(250);
+  check('Vorschau beim Ziehen über das Raster', dragResult && dragResult.preview === true, JSON.stringify(dragResult));
+  check('Fallenlassen öffnet den Editor mit der Aufgabe',
+    (await cdp.eval(`document.querySelector('#sheet input[type="text"]')?.value || ''`)) === droppedTitle);
+  await cdp.eval(`document.querySelector('#sheet .btn.primary').click()`);
+  await sleep(250);
+  check('Eingeplante Aufgabe steht als Block im Raster',
+    await cdp.eval(`[...document.querySelectorAll('.block .b-title')].some(t => t.textContent === ${JSON.stringify(droppedTitle)})`));
+
   // --- Fokus-Session ---
   const focusOcc = await cdp.eval(pickVisible);
   await cdp.eval(`(() => {

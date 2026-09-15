@@ -5,6 +5,7 @@ import {
   addDayTodo, updateDayTodo, removeDayTodo,
 } from './store.js';
 import { occurrencesByDate, plannedMinutes, findFreeSlot } from './recurrence.js';
+import { timeAtPoint, showDropPreview, clearDropPreview } from './grid.js';
 import { el, toast } from './ui.js';
 
 let app = null;
@@ -29,6 +30,7 @@ export function initPanels(appRef) {
     input.value = '';
     app.refresh();
   });
+  initDropTarget();
   document.getElementById('btn-carry').addEventListener('click', () => {
     const from = weekKey(addDays(app.cursor, -7));
     const to = weekKey(app.cursor);
@@ -38,7 +40,7 @@ export function initPanels(appRef) {
   });
 }
 
-function taskRow({ task, onToggle, onRename, onRemove, onSchedule }) {
+function taskRow({ task, onToggle, onRename, onRemove, onSchedule, onDone }) {
   const text = el('span', { class: 't-text', text: task.title, title: 'Klicken zum Umbenennen' });
   text.addEventListener('click', () => {
     const input = el('input', { type: 'text', value: task.title, style: 'flex:1;min-width:0' });
@@ -56,7 +58,11 @@ function taskRow({ task, onToggle, onRename, onRemove, onSchedule }) {
     input.select();
   });
 
-  return el('li', { class: task.done ? 'done' : '' }, [
+  const row = el('li', {
+    class: task.done ? 'done' : '',
+    draggable: onSchedule ? 'true' : null,
+    title: onSchedule ? 'In den Kalender ziehen, um sie einzuplanen' : null,
+  }, [
     el('input', { type: 'checkbox', class: 'cb', checked: task.done, onchange: (e) => onToggle(e.target.checked) }),
     text,
     el('div', { class: 'row-actions' }, [
@@ -64,6 +70,51 @@ function taskRow({ task, onToggle, onRename, onRemove, onSchedule }) {
       el('button', { class: 'mini-btn', type: 'button', title: 'Löschen', onclick: onRemove }, ['✕']),
     ]),
   ]);
+
+  if (onSchedule) {
+    row.addEventListener('dragstart', (e) => {
+      e.dataTransfer.effectAllowed = 'copy';
+      e.dataTransfer.setData('text/plain', task.title);
+      dragged = { title: task.title, onDone };
+      row.classList.add('dragging');
+    });
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging');
+      dragged = null;
+      clearDropPreview();
+    });
+  }
+  return row;
+}
+
+// Aufgabe, die gerade in den Kalender gezogen wird.
+let dragged = null;
+
+/** Ziehen aus der Seitenleiste ins Raster: Vorschau zeigen, beim Loslassen Block anlegen. */
+function initDropTarget() {
+  const columns = document.getElementById('columns');
+  columns.addEventListener('dragover', (e) => {
+    if (!dragged) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    showDropPreview(timeAtPoint(e.clientX, e.clientY));
+  });
+  columns.addEventListener('dragleave', (e) => {
+    if (!columns.contains(e.relatedTarget)) clearDropPreview();
+  });
+  columns.addEventListener('drop', (e) => {
+    if (!dragged) return;
+    e.preventDefault();
+    const spot = timeAtPoint(e.clientX, e.clientY);
+    clearDropPreview();
+    if (!spot) return;
+    const { title, onDone } = dragged;
+    dragged = null;
+    app.openEditor(null, { date: spot.date, start: spot.start, duration: 60, title });
+    if (onDone) {
+      toast('Eingeplant', { label: 'Aufgabe abhaken', onClick: onDone });
+    }
+  });
 }
 
 /** Aufgabe in einen freien Zeitblock am aktuellen Tag verwandeln. */
@@ -93,6 +144,7 @@ export function renderPanels() {
         onRename: (title) => { updateWeekTask(t.id, { title }); app.refresh(); },
         onRemove: () => { removeWeekTask(t.id); app.refresh(); },
         onSchedule: () => scheduleTask(t.title),
+        onDone: () => { updateWeekTask(t.id, { done: true }); app.refresh(); },
       }))
     : [el('li', { class: 'empty', text: 'Noch nichts für diese Woche.' })]));
   document.getElementById('week-count').textContent = tasks.length ? `${tasks.length - openTasks}/${tasks.length}` : '';
@@ -108,6 +160,7 @@ export function renderPanels() {
         onRename: (title) => { updateDayTodo(t.id, { title }); app.refresh(); },
         onRemove: () => { removeDayTodo(t.id); app.refresh(); },
         onSchedule: () => scheduleTask(t.title),
+        onDone: () => { updateDayTodo(t.id, { done: true }); app.refresh(); },
       }))
     : [el('li', { class: 'empty', text: 'Keine To-dos für diesen Tag.' })]));
   document.getElementById('day-count').textContent = todos.length ? `${todos.length - openTodos}/${todos.length}` : '';

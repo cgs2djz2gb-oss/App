@@ -243,6 +243,9 @@ ul { margin: 0; padding: 0; list-style: none; }
 }
 .task-list li:last-child { border-bottom: 0; }
 .task-list .t-text { flex: 1; min-width: 0; word-break: break-word; cursor: text; }
+.task-list li[draggable="true"] { cursor: grab; }
+.task-list li.dragging { opacity: .45; }
+.block.ghost.drop { border-style: dashed; opacity: .8; z-index: 14; }
 .task-list li.done .t-text { text-decoration: line-through; color: var(--text-faint); }
 .task-list .row-actions { display: flex; gap: 2px; opacity: .55; }
 .task-list li:hover .row-actions { opacity: 1; }
