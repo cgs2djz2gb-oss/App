@@ -283,6 +283,7 @@ window.addEventListener('hashchange', () => checkIncomingTransfer(app));
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register(new URL('../sw.js', import.meta.url)).catch(() => {});
+    // Relativ zum Dokument – funktioniert im Unterordner genauso wie im Wurzelverzeichnis.
+    navigator.serviceWorker.register('sw.js').catch(() => {});
   });
 }

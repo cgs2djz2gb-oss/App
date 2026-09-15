@@ -12,6 +12,8 @@ const CHROME_CANDIDATES = [
   process.env.CHROME_PATH,
 ].filter(Boolean);
 
+const rootFlag = process.argv.indexOf('--root');
+const ROOT_DIR = rootFlag > -1 ? process.argv[rootFlag + 1] : undefined;
 const shotsFlag = process.argv.indexOf('--shots');
 const SHOTS = shotsFlag > -1 ? process.argv[shotsFlag + 1] : null;
 const PORT = 4188;
@@ -60,7 +62,7 @@ async function main() {
   const stale = await fetch(`http://127.0.0.1:${DEV_PORT}/json/version`).then((r) => r.json()).catch(() => null);
   if (stale) throw new Error(`Port ${DEV_PORT} ist belegt – alten Testbrowser beenden (pkill -x chrome).`);
 
-  const server = await serve(PORT);
+  const server = await serve(PORT, ROOT_DIR);
   const profile = mkdtempSync(join(tmpdir(), 'tagwerk-'));
   const proc = browserProc = spawn(chrome, [
     '--headless=new', '--disable-gpu', '--no-sandbox', '--no-proxy-server',

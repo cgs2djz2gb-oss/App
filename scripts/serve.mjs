@@ -4,7 +4,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = fileURLToPath(new URL('..', import.meta.url));
+const DEFAULT_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
@@ -12,7 +12,8 @@ const TYPES = {
   '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon',
 };
 
-export function serve(port = 4173) {
+export function serve(port = 4173, root = DEFAULT_ROOT) {
+  const ROOT = root;
   const server = createServer(async (req, res) => {
     try {
       const url = new URL(req.url, 'http://localhost');
