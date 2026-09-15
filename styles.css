@@ -373,3 +373,12 @@ input[type="checkbox"].cb:checked::after {
   .view-toggle { display: inline-flex; align-items: center; padding: 0 10px; }
 }
 @media (max-width: 420px) { .head-cell .dnum { font-size: 15px; width: 26px; height: 26px; line-height: 26px; } }
+
+/* Wochen-Vorlagen */
+.tpl-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 0; border-bottom: 1px solid var(--line-soft);
+}
+.tpl-row:last-child { border-bottom: 0; }
+.tpl-info { flex: 1; min-width: 0; }
+.tpl-name { font-weight: 600; }

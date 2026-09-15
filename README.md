@@ -40,6 +40,19 @@ die App sucht dafür automatisch die nächste freie Lücke im Tag.
 - Checkliste pro Block – die Haken gelten nur für den einzelnen Termin,
   die Schritte selbst für die ganze Serie (perfekt für wiederkehrende Lernsessions)
 
+**Wochen-Vorlagen**
+- Eine gelungene Woche als Vorlage sichern (Menü ⋯ → *Wochen-Vorlagen*)
+- Auf jede andere Woche anwenden – wahlweise *Woche ersetzen* (räumt vorher auf,
+  Serien pausieren dann nur in dieser einen Woche) oder *hinzufügen*
+- Beliebig viele Vorlagen, umbenennbar, mit Rückgängig-Hinweis nach dem Anwenden
+
+**Geräte-Übertragung**
+- Menü ⋯ → *Auf anderes Gerät übertragen* erzeugt einen Link, der den kompletten
+  Stand komprimiert selbst enthält (gzip + base64) – kein Server, kein Konto
+- Auf dem iPhone per *Teilen…* direkt in iMessage/AirDrop, auf dem Mac per Kopieren
+- Beim Öffnen auf dem anderen Gerät: *Ersetzen* oder *Zusammenführen*
+- Das ist eine Übertragung, **kein laufender Abgleich** – beide Geräte speichern weiter für sich
+
 **Drumherum**
 - Überblick: geplante Stunden pro Tag/Woche, erledigte Blöcke, Balken über die Woche
 - Rückgängig/Wiederherstellen (⌘Z / ⇧⌘Z)
@@ -77,8 +90,9 @@ Jeder Static-Hoster genügt, die App braucht keinen Build.
 
 ```bash
 npm run dev          # http://localhost:4173
-npm test             # 19 Logiktests (Serien, Datum, Speicher)
-npm run test:browser # End-to-End im echten Chromium (Ziehen, Editor, Mobilansicht)
+npm test             # 23 Logiktests (Serien, Datum, Vorlagen, Übertragung, Speicher)
+npm run test:browser # 23 End-to-End-Checks im echten Chromium
+                     # (Ziehen, Tagwechsel, Editor, Vorlagen, Übertragungslink, Mobil, Dunkelmodus)
 ```
 
 Node 22+, sonst nichts. **Null Abhängigkeiten** – kein Bundler, kein Framework,
@@ -96,6 +110,8 @@ app/
   grid.js             Raster, Ziehen, Dehnen, Anlegen (Maus + Touch)
   editor.js           Block-Editor (Serien, Checkliste, Farben)
   panels.js           Wochenaufgaben, Tages-To-dos, Überblick
+  templates.js        Wochen-Vorlagen sichern und anwenden
+  transfer.js         Übertragung zwischen Geräten per Link
   ui.js               Sheet, Menü, Toasts
 sw.js                 Service Worker (Offline)
 scripts/              Dev-Server, Icon-Generator, Browser-Test
@@ -120,9 +136,10 @@ Datumsarithmetik läuft über UTC-Tagesindizes, damit Sommer-/Winterzeit nichts 
 
 ## Später möglich
 
-- Synchronisierung zwischen Geräten (z. B. über einen kleinen eigenen Server oder iCloud Drive/JSON)
+- **Echter Live-Sync** zwischen Mac und iPhone. Das geht nur mit einer Ablage im Netz;
+  der Übertragungslink ist der serverlose Ersatz. Möglich wären: eine kleine Funktion auf
+  Vercel mit Speicher-Add-on, ein eigener Mini-Server, oder eine Datei in iCloud Drive.
 - Abo-Import aus bestehenden Kalendern (`.ics`)
-- Vorlagen: eine ganze Woche als Vorlage speichern und auf andere Wochen anwenden
 - Als echte Desktop-App verpacken (Tauri oder Electron um dieselben Dateien)
 - Statistik über längere Zeiträume (geplant vs. tatsächlich erledigt)
 

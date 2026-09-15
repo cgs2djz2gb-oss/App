@@ -6,6 +6,8 @@ import { load, getState, setSetting, undo, redo, exportJson, importJson, createB
 import { initGrid, renderPlanner } from './grid.js';
 import { initPanels, renderPanels } from './panels.js';
 import { openBlockEditor } from './editor.js';
+import { openTemplateSheet } from './templates.js';
+import { openTransferSheet, checkIncomingTransfer } from './transfer.js';
 import { el, openMenu, closeSheet, isSheetOpen, toast, choose } from './ui.js';
 
 load();
@@ -30,6 +32,11 @@ export const app = {
     renderHeader();
     renderPlanner();
     renderPanels();
+  },
+  /** Mehrere Schritte auf einmal zurücknehmen (z. B. Vorlage anwenden = leeren + einfügen). */
+  undoAll(steps = 1) {
+    for (let i = 0; i < steps; i++) undo();
+    this.refresh();
   },
 };
 
@@ -118,6 +125,9 @@ function openMainMenu(anchor) {
     { type: 'custom', node: numberSetting('Raster (min)', 'snap', 5, 60, 5) },
     { type: 'custom', node: weekendSetting() },
     { type: 'custom', node: themeSetting() },
+    '-',
+    { label: 'Wochen-Vorlagen…', onClick: () => openTemplateSheet(app) },
+    { label: 'Auf anderes Gerät übertragen…', onClick: openTransferSheet },
     '-',
     { label: 'Daten sichern (JSON)', onClick: doExport },
     { label: 'Daten laden (JSON)', onClick: doImport },
@@ -267,6 +277,9 @@ initGrid(app);
 initPanels(app);
 wire();
 app.refresh();
+checkIncomingTransfer(app);
+// Wird der Übertragungslink in die schon geöffnete App eingefügt, ändert sich nur die Adresse.
+window.addEventListener('hashchange', () => checkIncomingTransfer(app));
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   window.addEventListener('load', () => {

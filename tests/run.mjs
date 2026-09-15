@@ -232,6 +232,73 @@ test('Zustand überlebt Neuladen (localStorage)', () => {
   }, 200));
 });
 
+// ---------- Wochen-Vorlagen ----------
+const { weekToItems, applyTemplate } = await import('../app/templates.js');
+
+test('Woche als Vorlage sichern und auf eine andere Woche anwenden', () => {
+  freshState();
+  store.createBlock({ title: 'Deep Work', date: '2026-09-14', start: 540, duration: 120,
+    recur: { every: 1, weekdays: [1, 3], until: null } });
+  store.createBlock({ title: 'Zahnarzt', date: '2026-09-17', start: 660, duration: 45 });
+
+  const items = weekToItems('2026-09-14');
+  assert.equal(items.length, 3, 'zwei Serientermine + ein Einzeltermin');
+  const id = store.saveTemplate('Standardwoche', items);
+  assert.ok(id);
+
+  applyTemplate(store.getState().templates[0], '2026-10-05', { replace: false });
+  const state = store.getState();
+  const at = (d) => occurrencesByDate(state, d, d).get(d) || [];
+  assert.equal(at('2026-10-05').length, 2, 'Montag: Serie + Vorlage');
+  assert.equal(at('2026-10-08').length, 1, 'Donnerstag aus der Vorlage');
+  assert.ok(at('2026-10-05').some((o) => o.title === 'Deep Work'));
+});
+
+test('Vorlage mit „Woche ersetzen" räumt vorher auf, Serie bleibt bestehen', () => {
+  freshState();
+  store.createBlock({ title: 'Sport', date: '2026-09-14', start: 1080, duration: 60,
+    recur: { every: 1, weekdays: [1], until: null } });
+  store.saveTemplate('Leer plus Lernen', [
+    { dow: 2, start: 600, duration: 90, title: 'Lernsession', color: 'lila', notes: '', todos: [] },
+  ]);
+  applyTemplate(store.getState().templates[0], '2026-09-21', { replace: true });
+  const state = store.getState();
+  const at = (d) => occurrencesByDate(state, d, d).get(d) || [];
+  assert.equal(at('2026-09-21').length, 0, 'Serientermin dieser Woche pausiert');
+  assert.equal(at('2026-09-22')[0].title, 'Lernsession');
+  assert.equal(at('2026-09-28').length, 1, 'Folgewoche läuft normal weiter');
+  assert.equal(state.blocks.filter((b) => b.recur).length, 1, 'Serie existiert noch');
+});
+
+test('Vorlagen-Blöcke übernehmen Checklisten als frische Kopien', () => {
+  freshState();
+  store.createBlock({ title: 'Lernen', date: '2026-09-14', start: 540, duration: 60,
+    todos: [{ id: 'x', title: 'Karteikarten', done: true }] });
+  const items = weekToItems('2026-09-14');
+  store.saveTemplate('T', items);
+  applyTemplate(store.getState().templates[0], '2026-09-21', { replace: false });
+  const copy = store.getState().blocks[1];
+  assert.equal(copy.todos[0].title, 'Karteikarten');
+  assert.equal(copy.todos[0].done, false, 'Haken starten leer');
+  assert.notEqual(copy.todos[0].id, 'x', 'eigene IDs');
+});
+
+// ---------- Geräte-Übertragung ----------
+test('Übertragungspaket ist verlustfrei (gzip + base64url)', async () => {
+  freshState();
+  store.createBlock({ title: 'Übertragung mit Ümläüten & Sonderzeichen ✓', date: '2026-09-14', start: 540, duration: 60 });
+  const json = store.exportJson();
+
+  const bytes = new TextEncoder().encode(json);
+  const packed = await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
+  const b64 = Buffer.from(packed).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const back = Buffer.from(b64.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+  const text = await new Response(new Blob([back]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+
+  assert.equal(text, json);
+  assert.ok(b64.length < json.length, 'Link ist kürzer als die Rohdaten');
+});
+
 const results = [];
 for (const [name, fn] of tests) {
   try {

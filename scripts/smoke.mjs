@@ -18,6 +18,7 @@ const PORT = 4188;
 const DEV_PORT = 9333;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let browserProc = null;
 
 class CDP {
   constructor(ws) { this.ws = ws; this.id = 0; this.pending = new Map(); this.events = []; }
@@ -54,9 +55,14 @@ async function main() {
   const chrome = CHROME_CANDIDATES.find((p) => existsSync(p));
   if (!chrome) throw new Error('Kein Chromium gefunden (CHROME_PATH setzen)');
 
+  // Reste eines abgebrochenen Laufs abfangen: sonst verbindet sich der Test mit
+  // einem alten Browser samt altem Zustand und meldet verwirrende Fehler.
+  const stale = await fetch(`http://127.0.0.1:${DEV_PORT}/json/version`).then((r) => r.json()).catch(() => null);
+  if (stale) throw new Error(`Port ${DEV_PORT} ist belegt – alten Testbrowser beenden (pkill -x chrome).`);
+
   const server = await serve(PORT);
   const profile = mkdtempSync(join(tmpdir(), 'tagwerk-'));
-  const proc = spawn(chrome, [
+  const proc = browserProc = spawn(chrome, [
     '--headless=new', '--disable-gpu', '--no-sandbox', '--no-proxy-server',
     '--disable-dev-shm-usage', '--hide-scrollbars',
     `--remote-debugging-port=${DEV_PORT}`, `--user-data-dir=${profile}`, 'about:blank',
@@ -207,11 +213,63 @@ async function main() {
   check('Tages-To-do gespeichert', (await cdp.eval(`document.querySelectorAll('#list-daytodos li').length`)) === 1);
   await shot('03-aufgaben');
 
+  // --- Wochen-Vorlagen ---
+  await cdp.eval(`document.getElementById('btn-menu').click()`);
+  await sleep(120);
+  await cdp.eval(`[...document.querySelectorAll('#menu button')].find(b => b.textContent.includes('Wochen-Vorlagen')).click()`);
+  await sleep(200);
+  check('Vorlagen-Dialog öffnet', await cdp.eval(`!document.getElementById('sheet').hidden`));
+  await cdp.eval(`(() => {
+    const i = document.querySelector('#sheet input[type="text"]');
+    i.value = 'Standardwoche';
+    [...document.querySelectorAll('#sheet .btn.small')].find(b => b.textContent === 'Sichern').click();
+  })()`);
+  await sleep(250);
+  const tplCount = await cdp.eval(`JSON.parse(localStorage.getItem('tagwerk.state.v1')).templates.length`);
+  check('Woche als Vorlage gesichert', tplCount === 1, `${tplCount} Vorlagen`);
+  await shot('07-vorlagen');
+
+  // Vorlage auf die nächste Woche anwenden
+  await cdp.eval(`document.querySelector('#sheet .btn.small.primary').click()`);
+  await sleep(200);
+  await cdp.eval(`document.getElementById('btn-menu').click()`); // Menü schließen, falls offen
+  await cdp.eval(`document.getElementById('menu').hidden = true`);
+  const blocksBefore = await cdp.eval(`JSON.parse(localStorage.getItem('tagwerk.state.v1')).blocks.length`);
+  await cdp.eval(`[...document.querySelectorAll('#sheet .btn')].find(b => b.textContent === 'Woche ersetzen').click()`);
+  await sleep(350);
+  const blocksAfter = await cdp.eval(`JSON.parse(localStorage.getItem('tagwerk.state.v1')).blocks.length`);
+  check('Vorlage angewendet', blocksAfter > blocksBefore, `${blocksBefore} → ${blocksAfter} Blöcke`);
+
+  // --- Übertragungslink ---
+  await cdp.eval(`document.getElementById('btn-menu').click()`);
+  await sleep(120);
+  await cdp.eval(`[...document.querySelectorAll('#menu button')].find(b => b.textContent.includes('anderes Gerät')).click()`);
+  await sleep(400);
+  const link = await cdp.eval(`document.querySelector('#sheet textarea')?.value || ''`);
+  check('Übertragungslink erzeugt', link.includes('#t=z') && link.length > 200, `${link.length} Zeichen`);
+  await shot('08-uebertragen');
+  await cdp.eval(`document.querySelector('#sheet .btn.ghost').click()`);
+
+  // Link auf einem „anderen Gerät" öffnen (frischer Speicher)
+  await cdp.eval(`localStorage.clear()`);
+  await goto('about:blank');           // wie ein frisches Gerät: vollständiger Seitenaufbau
+  await goto(link);
+  await sleep(500);
+  const sheetHtml = await cdp.eval(`document.getElementById('sheet').innerHTML.slice(0, 400)`);
+  if (process.env.DEBUG_SMOKE) console.log('SHEET:', sheetHtml);
+  await cdp.eval(`(() => {
+    const b = [...document.querySelectorAll('#sheet .btn')].find(x => /Übernehmen|Alles ersetzen/.test(x.textContent));
+    if (b) b.click();
+  })()`);
+  await sleep(400);
+  const imported = await cdp.eval(`JSON.parse(localStorage.getItem('tagwerk.state.v1') || '{"blocks":[]}').blocks.length`);
+  check('Daten über den Link übernommen', imported > 5, `${imported} Blöcke`);
+
   // --- Persistenz über Neuladen ---
   await sleep(300);
   await goto(`http://127.0.0.1:${PORT}/`);
   check('Daten überleben Neuladen',
-    (await cdp.eval(`document.querySelectorAll('.block').length`)) > 10 &&
+    (await cdp.eval(`document.querySelectorAll('.block').length`)) > 5 &&
     (await cdp.eval(`document.querySelectorAll('#list-weektasks li').length`)) === 1);
 
   // --- Tagesansicht + Mobil ---
@@ -247,4 +305,8 @@ async function main() {
   process.exit(failed.length ? 1 : 0);
 }
 
-main().catch((err) => { console.error(err); process.exit(1); });
+main().catch((err) => {
+  console.error(err);
+  if (browserProc) browserProc.kill();
+  process.exit(1);
+});

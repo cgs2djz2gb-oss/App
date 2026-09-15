@@ -32,6 +32,7 @@ export function defaultState() {
     overrides: {},        // "blockId|YYYY-MM-DD" -> { deleted?, start?, duration?, title?, notes?, color?, done?, todoDone? }
     weekTasks: [],        // { id, weekKey, title, done, createdAt }
     dayTodos: [],         // { id, date, title, done, createdAt }
+    templates: [],        // { id, name, createdAt, items: [{ dow, start, duration, title, color, notes, todos }] }
   };
 }
 
@@ -50,6 +51,7 @@ function migrate(raw) {
     overrides: raw.overrides && typeof raw.overrides === 'object' ? raw.overrides : {},
     weekTasks: Array.isArray(raw.weekTasks) ? raw.weekTasks : [],
     dayTodos: Array.isArray(raw.dayTodos) ? raw.dayTodos : [],
+    templates: Array.isArray(raw.templates) ? raw.templates : [],
   };
 }
 
@@ -313,6 +315,54 @@ export function removeDayTodo(id) {
   mutate((s) => { s.dayTodos = s.dayTodos.filter((t) => t.id !== id); });
 }
 
+// ---------- Wochen-Vorlagen ----------
+
+/** Eine Woche als Vorlage sichern. `items` kommt aus den Terminen der Woche. */
+export function saveTemplate(name, items) {
+  return mutate((s) => {
+    const tpl = { id: uid(), name, createdAt: Date.now(), items };
+    s.templates.push(tpl);
+    return tpl.id;
+  });
+}
+
+export function renameTemplate(id, name) {
+  mutate((s) => {
+    const t = s.templates.find((x) => x.id === id);
+    if (t) t.name = name;
+  });
+}
+
+export function removeTemplate(id) {
+  mutate((s) => { s.templates = s.templates.filter((t) => t.id !== id); });
+}
+
+/** Mehrere Blöcke auf einmal anlegen (ein einziger Undo-Schritt). */
+export function addBlocks(list) {
+  mutate((s) => {
+    for (const b of list) s.blocks.push(normalizeBlock({ ...b, id: uid() }));
+  });
+}
+
+/**
+ * Termine entfernen: Einzelblöcke werden gelöscht, Serientermine
+ * bekommen eine Ausnahme – die Serie selbst bleibt bestehen.
+ */
+export function clearOccurrences(occs) {
+  mutate((s) => {
+    const singles = new Set();
+    for (const o of occs) {
+      if (o.isRecurring) {
+        const key = ovKey(o.blockId, o.anchorDate);
+        s.overrides[key] = { ...(s.overrides[key] || {}), deleted: true };
+      } else {
+        singles.add(o.blockId);
+      }
+    }
+    s.blocks = s.blocks.filter((b) => !singles.has(b.id));
+  });
+}
+
 // ---------- Export / Import ----------
 
 export function exportJson() {
@@ -333,5 +383,7 @@ export function importJson(text, { merge = false } = {}) {
     for (const t of incoming.weekTasks) if (!wt.has(t.id)) s.weekTasks.push(t);
     const dt = new Set(s.dayTodos.map((t) => t.id));
     for (const t of incoming.dayTodos) if (!dt.has(t.id)) s.dayTodos.push(t);
+    const tp = new Set(s.templates.map((t) => t.id));
+    for (const t of incoming.templates || []) if (!tp.has(t.id)) s.templates.push(t);
   });
 }

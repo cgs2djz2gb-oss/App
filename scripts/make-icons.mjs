@@ -68,7 +68,8 @@ function draw(size, { padding = 0 } = {}) {
       // Hintergrund mit abgerundeten Ecken
       const inRounded = insideRounded(x, y, size, size, radius);
       if (!inRounded) { buf[i + 3] = 0; continue; }
-      const t = (x / size + y / size) / 2;
+      // Flächige Farbe statt Verlauf: deutlich kleinere Dateien, gleiche Optik in klein.
+      const t = Math.round(((x / size + y / size) / 2) * 6) / 6;
       const [r, g, b] = mix([59, 123, 255], [124, 92, 240], t);
       buf[i] = r; buf[i + 1] = g; buf[i + 2] = b; buf[i + 3] = 255;
 
