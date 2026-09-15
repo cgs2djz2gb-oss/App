@@ -22,17 +22,27 @@ export function initSession(appRef) {
 const session = () => getState().session;
 
 /**
- * Den Termin zur laufenden Session heraussuchen. Er darf zwischendurch
- * verschoben worden sein, deshalb wird ein paar Tage im Umkreis gesucht.
+ * Den Termin zur laufenden Session heraussuchen.
+ *
+ * Er darf zwischendurch verschoben worden sein - deshalb wird im Umkreis
+ * gesucht und der gemerkte Tag nachgezogen. Bei Einzelblöcken ändert sich
+ * beim Verschieben sogar der Ankertag (er *ist* das Datum des Blocks),
+ * darum zählt dort allein die Block-Kennung.
  */
 function sessionOccurrence() {
   const s = session();
   if (!s) return null;
   const anchor = s.date || s.anchorDate;
-  const buckets = occurrencesByDate(getState(), addDays(anchor, -3), addDays(anchor, 3));
+  const buckets = occurrencesByDate(getState(), addDays(anchor, -10), addDays(anchor, 10));
   for (const list of buckets.values()) {
-    const hit = list.find((o) => o.blockId === s.blockId && o.anchorDate === s.anchorDate);
-    if (hit) return hit;
+    const hit = list.find((o) => o.blockId === s.blockId
+      && (!s.recurring || o.anchorDate === s.anchorDate));
+    if (!hit) continue;
+    if (hit.date !== s.date || hit.anchorDate !== s.anchorDate) {
+      // Mitwandern, damit auch mehrere kleine Verschiebungen im Suchfenster bleiben.
+      setSession({ ...s, date: hit.date, anchorDate: hit.anchorDate });
+    }
+    return hit;
   }
   return null;
 }
@@ -59,6 +69,7 @@ export function startSession(occ) {
     blockId: occ.blockId,
     anchorDate: occ.anchorDate,
     date: occ.date,
+    recurring: occ.isRecurring,
     plannedMs: minutes * 60000,
     endsAt: Date.now() + minutes * 60000,
     remaining: null,
@@ -170,9 +181,13 @@ function render() {
   const circumference = 2 * Math.PI * 52;
   const doneTodos = occ.todos.filter((t) => t.done).length;
 
-  // Zwischen den Sekunden reicht es, Zahl und Ring zu aktualisieren –
-  // ein kompletter Neuaufbau würde den Tastaturfokus wegnehmen.
-  const signature = [occ.key, occ.title, occ.duration, doneTodos, occ.todos.length, done, isPaused()].join('|');
+  // Zwischen zwei Sekunden reicht es, Zahl und Ring zu aktualisieren;
+  // neu aufgebaut wird nur, wenn sich am Termin wirklich etwas geändert hat.
+  const signature = [
+    occ.key, occ.date, occ.start, occ.duration, occ.title, occ.color, occ.notes,
+    occ.todos.map((t) => `${t.title}:${t.done ? 1 : 0}`).join(','),
+    done, isPaused(),
+  ].join('|');
   if (renderedFor === signature && box.firstChild) {
     box.querySelector('.focus-clock').textContent = done ? 'Zeit ist um' : fmtClock(left);
     const ring = box.querySelector('.ring-value');
@@ -180,6 +195,10 @@ function render() {
     return;
   }
   renderedFor = signature;
+
+  // Beim Neuaufbau den Tastaturfokus in der Checkliste behalten.
+  const focusIndex = [...box.querySelectorAll('.focus-todos input[type="checkbox"]')]
+    .indexOf(document.activeElement);
 
   box.replaceChildren(el('div', { class: `focus-card ${done ? 'is-done' : ''}`, style: `--fg-c:var(--c-${occ.color});--bg-c:var(--c-${occ.color}-bg)` }, [
     el('div', { class: 'focus-head' }, [
@@ -222,6 +241,10 @@ function render() {
     occ.notes && el('p', { class: 'focus-notes', text: occ.notes }),
     el('button', { class: 'link-btn focus-stop', onclick: () => endSession() }, ['Session abbrechen']),
   ]));
+
+  if (focusIndex >= 0) {
+    box.querySelectorAll('.focus-todos input[type="checkbox"]')[focusIndex]?.focus();
+  }
 }
 
 function ringSvg(progress, circumference) {

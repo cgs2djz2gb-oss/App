@@ -341,19 +341,24 @@ async function main() {
   check('Session überlebt einen Neustart (gespeichert)', sessionSurvives);
 
   // Der Block darf während der Session umziehen, ohne sie abzuwürgen
-  await cdp.eval(`(() => {
-    const s = JSON.parse(localStorage.getItem('tagwerk.state.v1')).session;
-    window.__sessionBlock = s.blockId;
-  })()`);
   const focusTitleBefore = await cdp.eval(`document.querySelector('.focus-title').textContent`);
-  await cdp.eval(`(() => {
-    const b = [...document.querySelectorAll('.block')].find(n => n.dataset.blockId === window.__sessionBlock);
-    if (!b) return;
+  const moveDuringSession = await cdp.eval(`(() => {
+    const b = [...document.querySelectorAll('.block')].find(n => n.dataset.key === ${JSON.stringify(focusOcc.key)});
+    if (!b) return 'Block nicht gefunden';
+    const before = b._occ.date;
     b.focus();
     b.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+    return before;
   })()`);
   await sleep(600);
-  check('Session übersteht das Verschieben des Blocks',
+  const movedTo = await cdp.eval(`(() => {
+    const s = JSON.parse(localStorage.getItem('tagwerk.state.v1')).session;
+    return s ? s.date : null;
+  })()`);
+  check('Verschieben während der Session wirkt wirklich',
+    typeof moveDuringSession === 'string' && moveDuringSession.startsWith('2') && movedTo && movedTo !== moveDuringSession,
+    `${moveDuringSession} → ${movedTo}`);
+  check('Session läuft nach dem Verschieben weiter',
     (await cdp.eval(`!document.getElementById('focus').hidden`)) &&
     (await cdp.eval(`document.querySelector('.focus-title')?.textContent`)) === focusTitleBefore);
 
@@ -363,6 +368,43 @@ async function main() {
     (await cdp.eval(`document.getElementById('focus').hidden`)) &&
     (await cdp.eval(`document.getElementById('session-pill').hidden`)) &&
     (await cdp.eval(`document.querySelectorAll('.block.done').length`)) > 0);
+
+  // --- Session auf einem Einzelblock (dort wandert der Ankertag mit) ---
+  await cdp.eval(`(() => {
+    const grid = document.getElementById('columns');
+    const col = document.querySelectorAll('.col')[1];
+    const view = document.getElementById('grid-scroll').getBoundingClientRect();
+    const r = col.getBoundingClientRect();
+    window.__single = { x: r.left + r.width / 2, y: view.top + view.height - 60 };
+  })()`);
+  await cdp.eval(`(() => {
+    const s = JSON.parse(localStorage.getItem('tagwerk.state.v1'));
+    s.blocks.push({ id: 'einzel1', title: 'Einzeltermin', color: 'rot', notes: '',
+      date: document.querySelectorAll('.col')[1].dataset.date, start: 21 * 60, duration: 30,
+      todos: [], recur: null, done: false, createdAt: Date.now() });
+    localStorage.setItem('tagwerk.state.v1', JSON.stringify(s));
+  })()`);
+  await goto('about:blank');
+  await goto(`http://127.0.0.1:${PORT}/`);
+  await cdp.eval(`(() => {
+    const b = [...document.querySelectorAll('.block')].find(n => n._occ.title === 'Einzeltermin');
+    const r = b.getBoundingClientRect();
+    b.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: r.x + 20, clientY: r.y + 8 }));
+  })()`);
+  await sleep(150);
+  await cdp.eval(`[...document.querySelectorAll('#menu button')].find(b => b.textContent.includes('Fokus-Session')).click()`);
+  await sleep(300);
+  await cdp.eval(`(() => {
+    const b = [...document.querySelectorAll('.block')].find(n => n._occ.title === 'Einzeltermin');
+    b.focus();
+    b.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+  })()`);
+  await sleep(600);
+  check('Session bleibt auch bei einem verschobenen Einzelblock bestehen',
+    (await cdp.eval(`!document.getElementById('focus').hidden`)) &&
+    (await cdp.eval(`document.querySelector('.focus-title')?.textContent`)) === 'Einzeltermin');
+  await cdp.eval(`[...document.querySelectorAll('.focus-actions .btn')].find(b => b.textContent === 'Erledigt').click()`);
+  await sleep(250);
 
   // --- Wochen-Vorlagen ---
   await cdp.eval(`document.getElementById('btn-menu').click()`);
