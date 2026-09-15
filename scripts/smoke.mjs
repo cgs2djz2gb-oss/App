@@ -340,6 +340,23 @@ async function main() {
   })()`);
   check('Session überlebt einen Neustart (gespeichert)', sessionSurvives);
 
+  // Der Block darf während der Session umziehen, ohne sie abzuwürgen
+  await cdp.eval(`(() => {
+    const s = JSON.parse(localStorage.getItem('tagwerk.state.v1')).session;
+    window.__sessionBlock = s.blockId;
+  })()`);
+  const focusTitleBefore = await cdp.eval(`document.querySelector('.focus-title').textContent`);
+  await cdp.eval(`(() => {
+    const b = [...document.querySelectorAll('.block')].find(n => n.dataset.blockId === window.__sessionBlock);
+    if (!b) return;
+    b.focus();
+    b.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+  })()`);
+  await sleep(600);
+  check('Session übersteht das Verschieben des Blocks',
+    (await cdp.eval(`!document.getElementById('focus').hidden`)) &&
+    (await cdp.eval(`document.querySelector('.focus-title')?.textContent`)) === focusTitleBefore);
+
   await cdp.eval(`[...document.querySelectorAll('.focus-actions .btn')].find(b => b.textContent === 'Erledigt').click()`);
   await sleep(300);
   check('Erledigt beendet die Session und hakt den Block ab',

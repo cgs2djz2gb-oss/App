@@ -1,6 +1,6 @@
 // Fokus-Session: einen Block als Zeitblock wirklich durchziehen –
 // Countdown, Checkliste, am Ende als erledigt markieren.
-import { fmtTime, fmtDuration } from './dates.js';
+import { fmtTime, fmtDuration, addDays } from './dates.js';
 import { getState, setSession, patchOccurrence, toggleOccurrenceTodo } from './store.js';
 import { occurrencesByDate } from './recurrence.js';
 import { el, toast } from './ui.js';
@@ -21,13 +21,20 @@ export function initSession(appRef) {
 
 const session = () => getState().session;
 
-/** Den Termin zur laufenden Session heraussuchen (er kann verschoben oder gelöscht sein). */
+/**
+ * Den Termin zur laufenden Session heraussuchen. Er darf zwischendurch
+ * verschoben worden sein, deshalb wird ein paar Tage im Umkreis gesucht.
+ */
 function sessionOccurrence() {
   const s = session();
   if (!s) return null;
-  const date = s.date || s.anchorDate;
-  const list = occurrencesByDate(getState(), date, date).get(date) || [];
-  return list.find((o) => o.blockId === s.blockId && o.anchorDate === s.anchorDate) || null;
+  const anchor = s.date || s.anchorDate;
+  const buckets = occurrencesByDate(getState(), addDays(anchor, -3), addDays(anchor, 3));
+  for (const list of buckets.values()) {
+    const hit = list.find((o) => o.blockId === s.blockId && o.anchorDate === s.anchorDate);
+    if (hit) return hit;
+  }
+  return null;
 }
 
 function remainingMs() {
@@ -145,10 +152,12 @@ function announceEnd() {
   } catch { /* Ton ist Beiwerk */ }
 }
 
+let renderedFor = null;
+
 function render() {
   renderPill();
   const box = document.getElementById('focus');
-  if (box.hidden) return;
+  if (box.hidden) { renderedFor = null; return; }
   const s = session();
   if (!s) { closeFocus(); return; }
 
@@ -160,6 +169,17 @@ function render() {
   const progress = Math.min(1, 1 - left / (s.plannedMs || 1));
   const circumference = 2 * Math.PI * 52;
   const doneTodos = occ.todos.filter((t) => t.done).length;
+
+  // Zwischen den Sekunden reicht es, Zahl und Ring zu aktualisieren –
+  // ein kompletter Neuaufbau würde den Tastaturfokus wegnehmen.
+  const signature = [occ.key, occ.title, occ.duration, doneTodos, occ.todos.length, done, isPaused()].join('|');
+  if (renderedFor === signature && box.firstChild) {
+    box.querySelector('.focus-clock').textContent = done ? 'Zeit ist um' : fmtClock(left);
+    const ring = box.querySelector('.ring-value');
+    if (ring) ring.setAttribute('stroke-dashoffset', `${circumference * (1 - progress)}`);
+    return;
+  }
+  renderedFor = signature;
 
   box.replaceChildren(el('div', { class: `focus-card ${done ? 'is-done' : ''}`, style: `--fg-c:var(--c-${occ.color});--bg-c:var(--c-${occ.color}-bg)` }, [
     el('div', { class: 'focus-head' }, [
