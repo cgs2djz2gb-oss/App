@@ -1,0 +1,146 @@
+// Seitenleiste: Wochenaufgaben, Tages-To-dos, Überblick.
+import { weekKey, addDays, fmtDateShort, fmtHours, DOW_SHORT, dowOf, fmtDateLong, todayYmd } from './dates.js';
+import {
+  getState, addWeekTask, updateWeekTask, removeWeekTask, carryOverWeekTasks,
+  addDayTodo, updateDayTodo, removeDayTodo,
+} from './store.js';
+import { occurrencesByDate, plannedMinutes, findFreeSlot } from './recurrence.js';
+import { el, toast } from './ui.js';
+
+let app = null;
+
+export function initPanels(appRef) {
+  app = appRef;
+  document.getElementById('form-weektask').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const input = document.getElementById('input-weektask');
+    const title = input.value.trim();
+    if (!title) return;
+    addWeekTask(app.cursor, title);
+    input.value = '';
+    app.refresh();
+  });
+  document.getElementById('form-daytodo').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const input = document.getElementById('input-daytodo');
+    const title = input.value.trim();
+    if (!title) return;
+    addDayTodo(app.cursor, title);
+    input.value = '';
+    app.refresh();
+  });
+  document.getElementById('btn-carry').addEventListener('click', () => {
+    const from = weekKey(addDays(app.cursor, -7));
+    const to = weekKey(app.cursor);
+    const n = carryOverWeekTasks(from, to);
+    app.refresh();
+    toast(n ? `${n} Aufgabe(n) übernommen` : 'Keine offenen Aufgaben aus der Vorwoche');
+  });
+}
+
+function taskRow({ task, onToggle, onRename, onRemove, onSchedule }) {
+  const text = el('span', { class: 't-text', text: task.title, title: 'Klicken zum Umbenennen' });
+  text.addEventListener('click', () => {
+    const input = el('input', { type: 'text', value: task.title, style: 'flex:1;min-width:0' });
+    const commit = () => {
+      const v = input.value.trim();
+      if (v && v !== task.title) onRename(v); else app.refresh();
+    };
+    input.addEventListener('blur', commit);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') input.blur();
+      if (e.key === 'Escape') { input.value = task.title; input.blur(); }
+    });
+    text.replaceWith(input);
+    input.focus();
+    input.select();
+  });
+
+  return el('li', { class: task.done ? 'done' : '' }, [
+    el('input', { type: 'checkbox', class: 'cb', checked: task.done, onchange: (e) => onToggle(e.target.checked) }),
+    text,
+    el('div', { class: 'row-actions' }, [
+      onSchedule && el('button', { class: 'mini-btn', type: 'button', title: 'Als Block einplanen', onclick: onSchedule }, ['📅']),
+      el('button', { class: 'mini-btn', type: 'button', title: 'Löschen', onclick: onRemove }, ['✕']),
+    ]),
+  ]);
+}
+
+/** Aufgabe in einen freien Zeitblock am aktuellen Tag verwandeln. */
+function scheduleTask(title) {
+  const state = getState();
+  const date = app.cursor;
+  const occs = occurrencesByDate(state, date, date).get(date) || [];
+  const dayStart = state.settings.dayStart * 60;
+  const dayEnd = state.settings.dayEnd * 60;
+  const now = date === todayYmd() ? Math.max(dayStart, Math.floor(new Date().getHours() * 60 / 15) * 15) : dayStart + 120;
+  const start = findFreeSlot(occs, Math.min(now, dayEnd - 60), 60, dayEnd);
+  app.openEditor(null, { date, start, duration: 60, title });
+}
+
+export function renderPanels() {
+  const state = getState();
+  const wk = weekKey(app.cursor);
+
+  // --- Wochenaufgaben ---
+  const tasks = state.weekTasks.filter((t) => t.weekKey === wk);
+  const openTasks = tasks.filter((t) => !t.done).length;
+  const list = document.getElementById('list-weektasks');
+  list.replaceChildren(...(tasks.length
+    ? tasks.map((t) => taskRow({
+        task: t,
+        onToggle: (done) => { updateWeekTask(t.id, { done }); app.refresh(); },
+        onRename: (title) => { updateWeekTask(t.id, { title }); app.refresh(); },
+        onRemove: () => { removeWeekTask(t.id); app.refresh(); },
+        onSchedule: () => scheduleTask(t.title),
+      }))
+    : [el('li', { class: 'empty', text: 'Noch nichts für diese Woche.' })]));
+  document.getElementById('week-count').textContent = tasks.length ? `${tasks.length - openTasks}/${tasks.length}` : '';
+
+  // --- Tages-To-dos ---
+  const todos = state.dayTodos.filter((t) => t.date === app.cursor);
+  const openTodos = todos.filter((t) => !t.done).length;
+  const dlist = document.getElementById('list-daytodos');
+  dlist.replaceChildren(...(todos.length
+    ? todos.map((t) => taskRow({
+        task: t,
+        onToggle: (done) => { updateDayTodo(t.id, { done }); app.refresh(); },
+        onRename: (title) => { updateDayTodo(t.id, { title }); app.refresh(); },
+        onRemove: () => { removeDayTodo(t.id); app.refresh(); },
+        onSchedule: () => scheduleTask(t.title),
+      }))
+    : [el('li', { class: 'empty', text: 'Keine To-dos für diesen Tag.' })]));
+  document.getElementById('day-count').textContent = todos.length ? `${todos.length - openTodos}/${todos.length}` : '';
+  document.getElementById('day-label').textContent = fmtDateLong(app.cursor);
+
+  renderStats();
+}
+
+function renderStats() {
+  const state = getState();
+  const start = app.weekStart();
+  const end = addDays(start, 6);
+  const buckets = occurrencesByDate(state, start, end);
+  const todayOccs = buckets.get(app.cursor) || occurrencesByDate(state, app.cursor, app.cursor).get(app.cursor) || [];
+
+  const weekMinutes = [...buckets.values()].reduce((sum, list) => sum + plannedMinutes(list), 0);
+  const dayMinutes = plannedMinutes(todayOccs);
+  const doneCount = todayOccs.filter((o) => o.done).length;
+  const max = Math.max(60, ...[...buckets.values()].map((l) => plannedMinutes(l)));
+
+  const bars = el('div', { class: 'bars' }, [...buckets.entries()].map(([date, list]) => {
+    const m = plannedMinutes(list);
+    return el('div', { class: 'bar', title: `${fmtDateShort(date)}: ${fmtHours(m)}` }, [
+      el('i', { style: `height:${Math.round((m / max) * 100)}%` }),
+      el('b', { text: DOW_SHORT[dowOf(date)] }),
+    ]);
+  }));
+
+  document.getElementById('stats').replaceChildren(
+    el('div', { class: 'stat' }, [el('div', { class: 'v', text: fmtHours(dayMinutes) }), el('div', { class: 'k', text: 'geplant am Tag' })]),
+    el('div', { class: 'stat' }, [el('div', { class: 'v', text: fmtHours(weekMinutes) }), el('div', { class: 'k', text: 'geplant in der Woche' })]),
+    el('div', { class: 'stat' }, [el('div', { class: 'v', text: `${doneCount}/${todayOccs.length}` }), el('div', { class: 'k', text: 'Blöcke erledigt' })]),
+    el('div', { class: 'stat' }, [el('div', { class: 'v', text: String(state.weekTasks.filter((t) => t.weekKey === weekKey(app.cursor) && !t.done).length) }), el('div', { class: 'k', text: 'offene Wochenaufgaben' })]),
+    bars,
+  );
+}

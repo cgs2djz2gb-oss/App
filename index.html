@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Tagwerk – Tages- & Wochenplaner</title>
+<meta name="description" content="Lokaler Tages- und Wochenplaner mit verschiebbaren Zeitblöcken, Wiederholungen, Wochenaufgaben und To-dos.">
+<meta name="theme-color" content="#f7f7f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131316" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Tagwerk">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app" class="app">
+
+  <header class="topbar">
+    <div class="topbar-row">
+      <button class="icon-btn" id="btn-prev" title="Zurück (←)" aria-label="Zurück">‹</button>
+      <button class="btn ghost" id="btn-today" title="Heute (T)">Heute</button>
+      <button class="icon-btn" id="btn-next" title="Weiter (→)" aria-label="Weiter">›</button>
+      <div class="title-block">
+        <h1 id="range-title">–</h1>
+        <p id="range-sub" class="sub">–</p>
+      </div>
+      <div class="spacer"></div>
+      <div class="segmented" role="tablist" aria-label="Ansicht">
+        <button data-view="day" role="tab">Tag</button>
+        <button data-view="week" role="tab">Woche</button>
+      </div>
+      <button class="btn ghost view-toggle" id="btn-viewtoggle" title="Ansicht wechseln">Woche</button>
+      <div class="zoom">
+        <button class="icon-btn" id="btn-zoom-out" title="Kleiner" aria-label="Kleiner">–</button>
+        <button class="icon-btn" id="btn-zoom-in" title="Größer" aria-label="Größer">+</button>
+      </div>
+      <button class="icon-btn" id="btn-menu" title="Menü" aria-label="Menü">⋯</button>
+    </div>
+  </header>
+
+  <main class="main">
+    <section class="planner" id="planner">
+      <div class="grid-head" id="grid-head"></div>
+      <div class="grid-scroll" id="grid-scroll">
+        <div class="grid" id="grid">
+          <div class="gutter" id="gutter"></div>
+          <div class="columns" id="columns"></div>
+        </div>
+      </div>
+      <button class="fab" id="btn-add" title="Neuer Block (N)" aria-label="Neuer Block">＋</button>
+    </section>
+
+    <aside class="side" id="side">
+      <div class="side-inner">
+        <section class="panel" id="panel-week">
+          <div class="panel-head">
+            <h2>Wochenaufgaben</h2>
+            <span class="count" id="week-count"></span>
+          </div>
+          <form class="add-row" id="form-weektask">
+            <input type="text" id="input-weektask" placeholder="Aufgabe für diese Woche…" autocomplete="off">
+            <button class="btn small" type="submit">Hinzufügen</button>
+          </form>
+          <ul class="task-list" id="list-weektasks"></ul>
+          <button class="link-btn" id="btn-carry">Offene aus Vorwoche übernehmen</button>
+        </section>
+
+        <section class="panel" id="panel-day">
+          <div class="panel-head">
+            <h2>To-dos <span class="muted" id="day-label"></span></h2>
+            <span class="count" id="day-count"></span>
+          </div>
+          <form class="add-row" id="form-daytodo">
+            <input type="text" id="input-daytodo" placeholder="To-do für diesen Tag…" autocomplete="off">
+            <button class="btn small" type="submit">Hinzufügen</button>
+          </form>
+          <ul class="task-list" id="list-daytodos"></ul>
+        </section>
+
+        <section class="panel" id="panel-stats">
+          <div class="panel-head"><h2>Überblick</h2></div>
+          <div class="stats" id="stats"></div>
+        </section>
+      </div>
+    </aside>
+  </main>
+
+  <nav class="tabbar">
+    <button data-tab="planner" class="active">Plan</button>
+    <button data-tab="side">Aufgaben</button>
+  </nav>
+</div>
+
+<div class="toast-wrap" id="toast-wrap"></div>
+<div class="sheet-backdrop" id="sheet-backdrop" hidden></div>
+<div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-label="Block bearbeiten"></div>
+<div class="menu" id="menu" hidden role="menu"></div>
+
+<script type="module" src="app/main.js"></script>
+</body>
+</html>
