@@ -231,6 +231,48 @@ async function main() {
   check('Duplizieren legt einen Block an',
     (await cdp.eval(`document.querySelectorAll('.block').length`)) === blocksBeforeDup + 1);
 
+  // --- Fokus-Session ---
+  const focusOcc = await cdp.eval(pickVisible);
+  await cdp.eval(`(() => {
+    const b = [...document.querySelectorAll('.block')].find(n => n.dataset.key === ${JSON.stringify(focusOcc.key)});
+    const r = b.getBoundingClientRect();
+    b.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: r.x + 30, clientY: r.y + 12 }));
+  })()`);
+  await sleep(150);
+  await cdp.eval(`[...document.querySelectorAll('#menu button')].find(b => b.textContent.includes('Fokus-Session')).click()`);
+  await sleep(400);
+  check('Fokus-Session startet', await cdp.eval(`!document.getElementById('focus').hidden`));
+  const clock = await cdp.eval(`document.querySelector('.focus-clock').textContent`);
+  check('Countdown läuft', /^\d{2}:\d{2}$/.test(clock), `Anzeige: ${clock}`);
+  check('Zeitring zeichnet den Fortschritt',
+    await cdp.eval(`!!document.querySelector('.ring-value')`));
+  check('Laufende Session erscheint in der Kopfzeile',
+    await cdp.eval(`!document.getElementById('session-pill').hidden`));
+  await shot('09-fokus');
+
+  await cdp.eval(`[...document.querySelectorAll('.focus-actions .btn')].find(b => b.textContent === 'Pause').click()`);
+  await sleep(200);
+  check('Pause hält die Zeit an',
+    await cdp.eval(`document.querySelector('.focus-state').textContent === 'Pausiert'`));
+  const beforeExtend = await cdp.eval(`document.querySelector('.focus-clock').textContent`);
+  await cdp.eval(`[...document.querySelectorAll('.focus-actions .btn')].find(b => b.textContent === '+5 min').click()`);
+  await sleep(200);
+  check('Verlängern schlägt fünf Minuten drauf',
+    (await cdp.eval(`document.querySelector('.focus-clock').textContent`)) !== beforeExtend);
+
+  const sessionSurvives = await cdp.eval(`(() => {
+    const s = JSON.parse(localStorage.getItem('tagwerk.state.v1')).session;
+    return !!s && !!s.blockId;
+  })()`);
+  check('Session überlebt einen Neustart (gespeichert)', sessionSurvives);
+
+  await cdp.eval(`[...document.querySelectorAll('.focus-actions .btn')].find(b => b.textContent === 'Erledigt').click()`);
+  await sleep(300);
+  check('Erledigt beendet die Session und hakt den Block ab',
+    (await cdp.eval(`document.getElementById('focus').hidden`)) &&
+    (await cdp.eval(`document.getElementById('session-pill').hidden`)) &&
+    (await cdp.eval(`document.querySelectorAll('.block.done').length`)) > 0);
+
   // --- Wochen-Vorlagen ---
   await cdp.eval(`document.getElementById('btn-menu').click()`);
   await sleep(120);

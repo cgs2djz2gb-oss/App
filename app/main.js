@@ -11,6 +11,7 @@ import { initPanels, renderPanels } from './panels.js';
 import { openBlockEditor } from './editor.js';
 import { openTemplateSheet } from './templates.js';
 import { openTransferSheet, checkIncomingTransfer } from './transfer.js';
+import { initSession, startSession, openFocus, renderPill } from './session.js';
 import { el, openMenu, closeMenu, closeSheet, isSheetOpen, toast, choose } from './ui.js';
 
 load();
@@ -41,6 +42,10 @@ export const app = {
     renderHeader();
     renderPlanner();
     renderPanels();
+    renderPill();
+  },
+  startSession(occ) {
+    startSession(occ);
   },
   /** Mehrere Schritte auf einmal zurücknehmen (z. B. Vorlage anwenden = leeren + einfügen). */
   undoAll(steps = 1) {
@@ -121,6 +126,7 @@ function openBlockContextMenu(occ, point) {
   const scope = occ.isRecurring ? 'single' : 'series';
   openMenu([
     { label: 'Bearbeiten…', onClick: () => app.openEditor(occ) },
+    { label: 'Fokus-Session starten', onClick: () => startSession(occ) },
     {
       label: occ.done ? 'Als offen markieren' : 'Als erledigt markieren',
       onClick: () => {
@@ -265,7 +271,7 @@ async function wipe() {
 }
 
 function showHelp() {
-  toast('← → blättern · T heute · D/W Ansicht · N neuer Block · ⌘Z zurück');
+  toast('← → blättern · T heute · D/W Ansicht · N neuer Block · F Fokus · ⌘Z zurück');
 }
 
 function seedDemo() {
@@ -342,6 +348,7 @@ function wire() {
       return;
     }
     if (typing || isSheetOpen()) return;
+    if (e.key === 'f' || e.key === 'F') { openFocus(); return; }
     switch (e.key) {
       case 'ArrowLeft': step(-1); break;
       case 'ArrowRight': step(1); break;
@@ -365,6 +372,7 @@ function wire() {
 applyTheme();
 initGrid(app);
 initPanels(app);
+initSession(app);
 wire();
 app.refresh();
 checkIncomingTransfer(app);

@@ -1,10 +1,10 @@
 // Service Worker: App-Shell offline verfügbar halten.
-const CACHE = 'tagwerk-v2';
+const CACHE = 'tagwerk-v3';
 const SHELL = [
   './', './index.html', './styles.css', './manifest.webmanifest',
   './app/main.js', './app/store.js', './app/dates.js', './app/recurrence.js',
   './app/grid.js', './app/editor.js', './app/panels.js', './app/ui.js',
-  './app/templates.js', './app/transfer.js',
+  './app/templates.js', './app/transfer.js', './app/session.js',
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
 ];
 

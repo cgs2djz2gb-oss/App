@@ -5,6 +5,7 @@ import {
   toggleOccurrenceTodo, getBlock,
 } from './store.js';
 import { el, openSheet, closeSheet, toast, choose } from './ui.js';
+import { startSession } from './session.js';
 
 const DOW_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Mo … So
 
@@ -289,6 +290,10 @@ export function openBlockEditor(occ, draft, app) {
         el('input', { type: 'checkbox', class: 'cb', checked: model.done, onchange: (e) => { model.done = e.target.checked; } }),
         el('span', { text: 'Erledigt' }),
       ]),
+      !isNew && el('button', { class: 'btn primary', type: 'button', style: 'height:38px', onclick: () => {
+        closeSheet();
+        startSession(occ);
+      } }, ['Fokus-Session starten']),
       el('div', { class: 'sheet-actions' }, [
         !isNew && el('button', { class: 'btn danger', type: 'button', onclick: remove }, ['Löschen']),
         el('div', { class: 'spacer', style: 'flex:1' }),

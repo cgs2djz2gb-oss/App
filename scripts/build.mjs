@@ -8,7 +8,7 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const OUT = process.argv[2] || join(ROOT, 'dist');
 
 // Reihenfolge = Abhängigkeitsreihenfolge (keine Zyklen).
-const MODULES = ['dates', 'store', 'recurrence', 'ui', 'grid', 'editor', 'panels', 'templates', 'transfer', 'main'];
+const MODULES = ['dates', 'store', 'recurrence', 'ui', 'session', 'grid', 'editor', 'panels', 'templates', 'transfer', 'main'];
 
 /** Volle Kommentarzeilen und Einrückung entfernen – spart Platz, ändert nichts am Verhalten. */
 function slim(code) {

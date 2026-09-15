@@ -33,6 +33,7 @@ export function defaultState() {
     weekTasks: [],        // { id, weekKey, title, done, createdAt }
     dayTodos: [],         // { id, date, title, done, createdAt }
     templates: [],        // { id, name, createdAt, items: [{ dow, start, duration, title, color, notes, todos }] }
+    session: null,        // laufende Fokus-Session: { blockId, anchorDate, endsAt, remaining }
   };
 }
 
@@ -52,6 +53,7 @@ function migrate(raw) {
     weekTasks: Array.isArray(raw.weekTasks) ? raw.weekTasks : [],
     dayTodos: Array.isArray(raw.dayTodos) ? raw.dayTodos : [],
     templates: Array.isArray(raw.templates) ? raw.templates : [],
+    session: raw.session && typeof raw.session === 'object' ? raw.session : null,
   };
 }
 
@@ -363,10 +365,19 @@ export function clearOccurrences(occs) {
   });
 }
 
+// ---------- Fokus-Session ----------
+
+/** Laufende Session setzen oder mit null beenden (kein Undo-Schritt). */
+export function setSession(session) {
+  mutate((s) => { s.session = session; }, { undoable: false });
+}
+
 // ---------- Export / Import ----------
 
 export function exportJson() {
-  return JSON.stringify({ ...state, exportedAt: new Date().toISOString() }, null, 2);
+  // Eine laufende Session gehört zum Gerät, nicht zu den Daten.
+  const { session, ...data } = state;
+  return JSON.stringify({ ...data, exportedAt: new Date().toISOString() }, null, 2);
 }
 
 export function importJson(text, { merge = false } = {}) {
