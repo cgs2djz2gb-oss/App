@@ -2,13 +2,16 @@
 import {
   addDays, startOfWeek, todayYmd, fmtDateLong, fmtDateShort, isoWeek, MONTHS, parseYmd, DOW_SHORT,
 } from './dates.js';
-import { load, getState, setSetting, undo, redo, exportJson, importJson, createBlock, uid } from './store.js';
+import {
+  load, getState, setSetting, undo, redo, exportJson, importJson, createBlock, uid,
+  COLORS, patchOccurrence, deleteOccurrence,
+} from './store.js';
 import { initGrid, renderPlanner } from './grid.js';
 import { initPanels, renderPanels } from './panels.js';
 import { openBlockEditor } from './editor.js';
 import { openTemplateSheet } from './templates.js';
 import { openTransferSheet, checkIncomingTransfer } from './transfer.js';
-import { el, openMenu, closeSheet, isSheetOpen, toast, choose } from './ui.js';
+import { el, openMenu, closeMenu, closeSheet, isSheetOpen, toast, choose } from './ui.js';
 
 load();
 
@@ -27,6 +30,12 @@ export const app = {
   },
   openEditor(occ, draft) {
     openBlockEditor(occ, draft || {}, this);
+  },
+  openBlockMenu(occ, point) {
+    openBlockContextMenu(occ, point);
+  },
+  step(dir) {
+    step(dir);
   },
   refresh() {
     renderHeader();
@@ -79,6 +88,85 @@ function newBlockHere() {
   const raw = isToday ? now.getHours() * 60 + now.getMinutes() : s.dayStart * 60 + 120;
   const start = Math.min(Math.round(raw / s.snap) * s.snap, s.dayEnd * 60 - 60);
   app.openEditor(null, { date: app.cursor, start: Math.max(start, s.dayStart * 60), duration: 60 });
+}
+
+// ---------- Kontextmenü auf einem Block ----------
+
+function colorRow(occ) {
+  const row = el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;padding:6px 10px 8px' },
+    COLORS.map((c) => el('button', {
+      type: 'button', class: 'swatch', title: c.label,
+      style: `background:var(--c-${c.id});width:22px;height:22px`,
+      'aria-pressed': occ.color === c.id ? 'true' : 'false',
+      onclick: () => {
+        closeMenu();
+        const prev = occ.color;
+        patchOccurrence(occ.blockId, occ.anchorDate, { color: c.id }, 'series');
+        app.refresh();
+        if (!occ.isRecurring) return;
+        toast('Farbe der Serie geändert', {
+          label: 'Nur dieser Termin',
+          onClick: () => {
+            patchOccurrence(occ.blockId, occ.anchorDate, { color: prev }, 'series');
+            patchOccurrence(occ.blockId, occ.anchorDate, { color: c.id }, 'single');
+            app.refresh();
+          },
+        });
+      },
+    })));
+  return row;
+}
+
+function openBlockContextMenu(occ, point) {
+  const scope = occ.isRecurring ? 'single' : 'series';
+  openMenu([
+    { label: 'Bearbeiten…', onClick: () => app.openEditor(occ) },
+    {
+      label: occ.done ? 'Als offen markieren' : 'Als erledigt markieren',
+      onClick: () => {
+        patchOccurrence(occ.blockId, occ.anchorDate, { done: !occ.done }, scope);
+        app.refresh();
+      },
+    },
+    {
+      label: 'Duplizieren',
+      onClick: () => {
+        const s = getState().settings;
+        const start = Math.min(occ.start + occ.duration, s.dayEnd * 60 - occ.duration);
+        createBlock({
+          title: occ.title, color: occ.color, notes: occ.notes,
+          date: occ.date, start, duration: occ.duration,
+          todos: occ.todos.map((t) => ({ id: uid(), title: t.title, done: false })),
+          recur: null,
+        });
+        app.refresh();
+        toast('Kopie angelegt');
+      },
+    },
+    { type: 'title', label: 'Farbe' },
+    { type: 'custom', node: colorRow(occ) },
+    '-',
+    {
+      label: occ.isRecurring ? 'Diesen Termin löschen' : 'Löschen',
+      onClick: () => {
+        deleteOccurrence(occ.blockId, occ.anchorDate, scope);
+        app.refresh();
+        toast('Gelöscht', { label: 'Rückgängig', onClick: () => app.undoAll(1) });
+      },
+    },
+    occ.isRecurring && {
+      label: 'Ganze Serie löschen',
+      onClick: async () => {
+        const ok = await choose('Ganze Serie löschen?', [
+          { label: 'Serie löschen', value: 'yes', danger: true },
+        ], { text: `„${occ.title}" verschwindet damit aus allen Wochen.` });
+        if (ok !== 'yes') return;
+        deleteOccurrence(occ.blockId, occ.anchorDate, 'series');
+        app.refresh();
+        toast('Serie gelöscht', { label: 'Rückgängig', onClick: () => app.undoAll(1) });
+      },
+    },
+  ].filter(Boolean), { left: point.x, right: point.x, bottom: point.y, width: 0 });
 }
 
 // ---------- Menü ----------
@@ -231,6 +319,8 @@ function wire() {
   document.getElementById('btn-viewtoggle').onclick = () =>
     app.setView(app.view === 'day' ? 'week' : 'day');
   document.getElementById('sheet-backdrop').onclick = () => closeSheet();
+  document.getElementById('btn-empty-new').onclick = newBlockHere;
+  document.getElementById('btn-empty-demo').onclick = seedDemo;
 
   const appEl = document.getElementById('app');
   document.querySelectorAll('.tabbar button').forEach((b) => {
@@ -243,7 +333,7 @@ function wire() {
   appEl.dataset.tab = 'planner';
 
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { closeSheet(); return; }
+    if (e.key === 'Escape') { closeMenu(); closeSheet(); return; }
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
       e.preventDefault();

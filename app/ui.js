@@ -63,9 +63,12 @@ export function openMenu(items, anchorRect) {
   }
   menu.hidden = false;
   const w = menu.offsetWidth;
-  const left = Math.max(8, Math.min(anchorRect.right - w, window.innerWidth - w - 8));
-  menu.style.left = `${left}px`;
-  menu.style.top = `${anchorRect.bottom + 6}px`;
+  const h = menu.offsetHeight;
+  // An einem Punkt (Kontextmenü) links ausrichten, an einer Schaltfläche rechtsbündig.
+  const wanted = anchorRect.width ? anchorRect.right - w : anchorRect.left;
+  menu.style.left = `${Math.max(8, Math.min(wanted, window.innerWidth - w - 8))}px`;
+  const top = anchorRect.bottom + 6;
+  menu.style.top = `${Math.max(8, Math.min(top, window.innerHeight - h - 8))}px`;
   setTimeout(() => document.addEventListener('pointerdown', onDocDown, { once: true }), 0);
 }
 

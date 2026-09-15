@@ -215,6 +215,22 @@ async function main() {
   check('Tages-To-do gespeichert', (await cdp.eval(`document.querySelectorAll('#list-daytodos li').length`)) === 1);
   await shot('03-aufgaben');
 
+  // --- Kontextmenü auf einem Block ---
+  const ctx = await cdp.eval(pickVisible);
+  await cdp.eval(`(() => {
+    const b = [...document.querySelectorAll('.block')].find(n => n.dataset.key === ${JSON.stringify(ctx.key)});
+    const r = b.getBoundingClientRect();
+    b.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: r.x + 30, clientY: r.y + 12 }));
+  })()`);
+  await sleep(200);
+  check('Rechtsklick öffnet Blockmenü',
+    await cdp.eval(`!document.getElementById('menu').hidden && [...document.querySelectorAll('#menu button')].some(b => b.textContent.includes('Duplizieren'))`));
+  const blocksBeforeDup = await cdp.eval(`document.querySelectorAll('.block').length`);
+  await cdp.eval(`[...document.querySelectorAll('#menu button')].find(b => b.textContent === 'Duplizieren').click()`);
+  await sleep(250);
+  check('Duplizieren legt einen Block an',
+    (await cdp.eval(`document.querySelectorAll('.block').length`)) === blocksBeforeDup + 1);
+
   // --- Wochen-Vorlagen ---
   await cdp.eval(`document.getElementById('btn-menu').click()`);
   await sleep(120);
@@ -274,9 +290,42 @@ async function main() {
     (await cdp.eval(`document.querySelectorAll('.block').length`)) > 5 &&
     (await cdp.eval(`document.querySelectorAll('#list-weektasks li').length`)) === 1);
 
+  // --- Leerer Zustand ---
+  await cdp.eval(`localStorage.clear()`);
+  await goto('about:blank');
+  await goto(`http://127.0.0.1:${PORT}/`);
+  check('Leerer Zustand erklärt den Einstieg',
+    await cdp.eval(`!document.getElementById('empty-state').hidden`));
+  await cdp.eval(`document.getElementById('btn-empty-demo').click()`);
+  await sleep(300);
+  check('Beispielwoche aus dem leeren Zustand',
+    (await cdp.eval(`document.querySelectorAll('.block').length`)) > 10 &&
+    (await cdp.eval(`document.getElementById('empty-state').hidden`)));
+
   // --- Tagesansicht + Mobil ---
   await setViewport(390, 844, true);
   await goto(`http://127.0.0.1:${PORT}/`);
+
+  // Wischgeste: nach links blättert vorwärts
+  const titleBefore = await cdp.eval(`document.getElementById('range-title').textContent`);
+  await cdp.eval(`(() => {
+    const col = document.querySelector('.col');
+    const r = col.getBoundingClientRect();
+    const y = r.top + 200;
+    const opts = (x) => ({ bubbles: true, clientX: x, clientY: y, pointerId: 7, pointerType: 'touch', isPrimary: true });
+    col.setPointerCapture = () => {};
+    col.dispatchEvent(new PointerEvent('pointerdown', opts(300)));
+    col.dispatchEvent(new PointerEvent('pointermove', opts(260)));
+    col.dispatchEvent(new PointerEvent('pointermove', opts(160)));
+    col.dispatchEvent(new PointerEvent('pointerup', opts(140)));
+  })()`);
+  await sleep(300);
+  check('Wischen blättert die Ansicht weiter',
+    (await cdp.eval(`document.getElementById('range-title').textContent`)) !== titleBefore,
+    `${titleBefore} bleibt stehen`);
+  await cdp.eval(`document.getElementById('btn-today').click()`);
+  await sleep(200);
+
   check('Kompakter Ansichts-Umschalter sichtbar auf dem Handy',
     await cdp.eval(`getComputedStyle(document.getElementById('btn-viewtoggle')).display !== 'none'`));
   await cdp.eval(`document.getElementById('btn-viewtoggle').click()`);

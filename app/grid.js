@@ -13,6 +13,7 @@ export function initGrid(appRef) {
   app = appRef;
   const cols = document.getElementById('columns');
   cols.addEventListener('pointerdown', onGridPointerDown);
+  cols.addEventListener('contextmenu', onBlockContextMenu);
   document.getElementById('grid-head').addEventListener('click', onHeadClick);
   clearInterval(nowTimer);
   nowTimer = setInterval(() => renderNowLine(), 30000);
@@ -46,6 +47,7 @@ export function renderPlanner() {
   renderHead(dates);
   renderColumns(dates);
   renderNowLine();
+  document.getElementById('empty-state').hidden = state.blocks.length > 0;
 
   if (!didInitialScroll) {
     didInitialScroll = true;
@@ -148,6 +150,13 @@ function renderNowLine() {
   const min = nowMinutes();
   if (min < dayStartMin() || min > dayEndMin()) return;
   col.append(el('div', { class: 'nowline', style: `top:${minToY(min)}px` }));
+}
+
+function onBlockContextMenu(e) {
+  const node = e.target.closest('.block');
+  if (!node || !node._occ) return;
+  e.preventDefault();
+  app.openBlockMenu(node._occ, { x: e.clientX, y: e.clientY });
 }
 
 function onHeadClick(e) {
@@ -318,18 +327,25 @@ function startCreateGesture(e) {
   const startY = e.clientY;
 
   if (touch) {
-    // Auf Touch: Tippen legt an, Wischen scrollt.
+    // Auf Touch: Tippen legt an, senkrecht wischen scrollt, waagerecht blättert.
     let panLast = startY;
-    let scrolled = false;
+    let mode = null;                 // null | 'scroll' | 'swipe'
+    const startXTouch = e.clientX;
     const onMove = (ev) => {
-      if (Math.abs(ev.clientY - startY) > 6) scrolled = true;
-      if (scrolled) { scroller.scrollTop -= ev.clientY - panLast; panLast = ev.clientY; }
+      const dx = ev.clientX - startXTouch;
+      const dy = ev.clientY - startY;
+      if (!mode && Math.max(Math.abs(dx), Math.abs(dy)) > 8) {
+        mode = Math.abs(dx) > Math.abs(dy) * 1.4 ? 'swipe' : 'scroll';
+      }
+      if (mode === 'scroll') { scroller.scrollTop -= ev.clientY - panLast; panLast = ev.clientY; }
     };
-    const onUp = () => {
+    const onUp = (ev) => {
       col.removeEventListener('pointermove', onMove);
       col.removeEventListener('pointerup', onUp);
       col.removeEventListener('pointercancel', onUp);
-      if (!scrolled) app.openEditor(null, { date, start: startMin, duration: 60 });
+      const dx = ev.clientX - startXTouch;
+      if (mode === 'swipe' && Math.abs(dx) > 55) app.step(dx < 0 ? 1 : -1);
+      else if (!mode) app.openEditor(null, { date, start: startMin, duration: 60 });
     };
     col.setPointerCapture(e.pointerId);
     col.addEventListener('pointermove', onMove);

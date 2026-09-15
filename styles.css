@@ -211,6 +211,20 @@ ul { margin: 0; padding: 0; list-style: none; }
   background: var(--accent); color: #fff; font-size: 22px; box-shadow: var(--shadow); z-index: 15;
 }
 
+/* ---------- Leerer Zustand ---------- */
+.empty-state {
+  position: absolute; inset: 0; z-index: 12; display: grid; place-items: center;
+  padding: 24px; pointer-events: none;
+}
+.empty-card {
+  pointer-events: auto; max-width: 22rem; text-align: center;
+  background: var(--bg-elev); border: 1px solid var(--line);
+  border-radius: 16px; padding: 20px; box-shadow: var(--shadow);
+}
+.empty-card h2 { font-size: 16px; font-weight: 640; margin-bottom: 6px; }
+.empty-card p { font-size: 13px; color: var(--text-dim); margin-bottom: 14px; }
+.empty-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
 /* ---------- Panels ---------- */
 .panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-dim); font-weight: 640; }
