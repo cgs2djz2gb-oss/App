@@ -55,6 +55,12 @@ die App sucht dafür automatisch die nächste freie Lücke im Tag.
 - Beim Öffnen auf dem anderen Gerät: *Ersetzen* oder *Zusammenführen*
 - Das ist eine Übertragung, **kein laufender Abgleich** – beide Geräte speichern weiter für sich
 
+**Jetzt-Leiste**
+- Über dem Raster steht, was gerade läuft oder als Nächstes ansteht – mit Restzeit
+- Ein Tipp startet die Session für den laufenden Block bzw. öffnet den nächsten
+- Läuft eine Fokus-Session, zeigt die Leiste sie samt Restzeit (am Handy der einzige
+  Platz dafür – in der Kopfzeile bliebe für das Datum sonst nichts übrig)
+
 **Fokus-Session**
 - Block starten (Kontextmenü, Editor oder Taste `F`): Countdown über die geplante Dauer,
   Checkliste zum Abhaken, Notizen im Blick
@@ -127,7 +133,7 @@ Jeder Static-Hoster genügt, die App braucht keinen Build-Schritt.
 ```bash
 npm run dev          # http://localhost:4173
 npm test             # 30 Logiktests (Serien, Datum, Vorlagen, Übertragung, Sicherung, Speicher)
-npm run test:browser # 68 End-to-End-Checks im echten Chromium (Ziehen, Tastatur, Kontextmenü,
+npm run test:browser # 72 End-to-End-Checks im echten Chromium (Ziehen, Tastatur, Kontextmenü,
                      # Fokus-Session, Vorlagen, Übertragung, Sicherung, Kategorien,
                      # Druckansicht, Mobil, Dunkelmodus)
 ```

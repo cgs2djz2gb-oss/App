@@ -100,6 +100,25 @@ await ev(`[...document.querySelectorAll('#menu button')].find(b => b.textContent
 await sleep(500);
 await shot('m6-fokus');
 
+// Dunkelmodus und Querformat
+await ev(`document.querySelector('.focus .icon-btn')?.click()`);
+await sleep(200);
+await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
+await sleep(300);
+await shot('m9-dunkel');
+await send('Emulation.setDeviceMetricsOverride', {
+  width: 852, height: 393, deviceScaleFactor: 2, mobile: true,
+  screenWidth: 852, screenHeight: 393,
+});
+await sleep(400);
+await shot('m10-quer');
+await send('Emulation.setEmulatedMedia', { features: [] });
+await send('Emulation.setDeviceMetricsOverride', {
+  width: 393, height: 852, deviceScaleFactor: 2, mobile: true,
+  screenWidth: 393, screenHeight: 852,
+});
+await sleep(300);
+
 // Kleines Gerät: iPhone SE
 await send('Emulation.setDeviceMetricsOverride', {
   width: 375, height: 667, deviceScaleFactor: 2, mobile: true,

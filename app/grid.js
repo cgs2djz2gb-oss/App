@@ -3,6 +3,7 @@ import { addDays, dowOf, fmtTime, todayYmd, nowMinutes, DOW_SHORT, fmtHours, par
 import { occurrencesByDate, layoutDay, plannedMinutes } from './recurrence.js';
 import { getState, moveOccurrence, patchOccurrence, deleteOccurrence, ovKey } from './store.js';
 import { toast, el } from './ui.js';
+import { openFocus } from './session.js';
 
 let app = null;               // wird von main.js gesetzt
 let buckets = new Map();
@@ -19,7 +20,7 @@ export function initGrid(appRef) {
   cols.addEventListener('contextmenu', onBlockContextMenu);
   document.getElementById('grid-head').addEventListener('click', onHeadClick);
   clearInterval(nowTimer);
-  nowTimer = setInterval(() => renderNowLine(), 30000);
+  nowTimer = setInterval(() => { renderNowLine(); renderNowBar(); }, 30000);
 }
 
 const settings = () => getState().settings;
@@ -70,6 +71,7 @@ export function renderPlanner() {
   renderHead(dates);
   renderColumns(dates);
   renderNowLine();
+  renderNowBar();
   document.getElementById('empty-state').hidden = state.blocks.length > 0;
 
   if (focusedKey) {
@@ -270,6 +272,64 @@ function onBlockKeydown(e) {
   }
 }
 
+/**
+ * Was läuft gerade, was kommt als Nächstes? Nur für heute - an anderen Tagen
+ * wäre die Leiste eine Behauptung über eine Zeit, die gar nicht gemeint ist.
+ */
+function renderNowBar() {
+  const bar = document.getElementById('nowbar');
+  const state = getState();
+  const today = todayYmd();
+  const occs = (buckets.get(today) || []).filter((o) => !o.done);
+  const min = nowMinutes();
+
+  // Läuft eine Fokus-Session, gehört sie hierher – auf schmalen Geräten ist das
+  // der einzige Platz dafür, und doppelt sagen muss man es ohnehin nicht.
+  const sess = state.session;
+  const sessionOcc = sess && [...buckets.values()].flat()
+    .find((o) => o.blockId === sess.blockId && o.anchorDate === sess.anchorDate);
+  if (sess && sessionOcc) {
+    const leftMs = sess.remaining ?? (sess.endsAt - Date.now());
+    const leftMin = Math.max(0, Math.round(leftMs / 60000));
+    show(sessionOcc, 'Fokus', leftMs <= 0 ? 'Zeit ist um' : `noch ${fmtGap(leftMin)}`, 'Öffnen ▸', () => openFocus());
+    return;
+  }
+
+  // Laufen mehrere Blöcke gleichzeitig, gilt der zuletzt begonnene – das ist
+  // in aller Regel der, den man gerade angefangen hat.
+  const running = occs
+    .filter((o) => min >= o.start && min < o.start + o.duration)
+    .sort((a, b) => b.start - a.start)[0];
+  const next = occs.filter((o) => o.start > min).sort((a, b) => a.start - b.start)[0];
+  const occ = running || next;
+
+  if (!occ || app.cursor !== today) { bar.hidden = true; return; }
+  if (running) show(occ, 'Jetzt', o2rest(running, min), 'Session ▸', () => app.startSession(occ));
+  else show(occ, 'Als Nächstes', `in ${fmtGap(occ.start - min)}`, fmtTime(occ.start), () => app.openEditor(occ));
+
+  function show(o, label, time, action, onClick) {
+    bar.hidden = false;
+    bar.style.setProperty('--fg-c', `var(--c-${o.color})`);
+    bar.replaceChildren(
+      el('span', { class: 'nb-dot' }),
+      el('span', { class: 'nb-label', text: label }),
+      el('span', { class: 'nb-title', text: o.title || 'Ohne Titel' }),
+      el('span', { class: 'nb-time', text: time }),
+      el('span', { class: 'nb-go', text: action }),
+    );
+    bar.onclick = onClick;
+  }
+}
+
+const o2rest = (occ, min) => `noch ${fmtGap(occ.start + occ.duration - min)}`;
+
+function fmtGap(minutes) {
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m ? `${h} h ${m} min` : `${h} h`;
+}
+
 function renderNowLine() {
   document.querySelectorAll('.nowline').forEach((n) => n.remove());
   const today = todayYmd();
@@ -290,7 +350,9 @@ function onBlockContextMenu(e) {
 function onHeadClick(e) {
   const cell = e.target.closest('.head-cell');
   if (!cell) return;
-  app.goToDate(cell.dataset.date, { switchToDay: app.view === 'day' });
+  // Auf schmalen Geräten ist der Tag die brauchbare Ansicht - dorthin führt der Tipp.
+  const narrow = matchMedia('(max-width: 700px)').matches;
+  app.goToDate(cell.dataset.date, { switchToDay: app.view === 'day' || narrow });
 }
 
 // ---------- Zeigergesten ----------

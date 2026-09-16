@@ -251,6 +251,39 @@ async function main() {
   check('Kategoriename erscheint in der Auswertung',
     await cdp.eval(`[...document.querySelectorAll('.cat-name')].some(n => n.textContent === 'Lernen')`));
 
+  // --- Jetzt-Leiste ---
+  await cdp.eval(`document.getElementById('btn-today').click()`);
+  await sleep(200);
+  await cdp.eval(`document.getElementById('btn-add').click()`);
+  await sleep(250);
+  await cdp.eval(`(() => {
+    const input = document.querySelector('#sheet input[type="text"]');
+    input.value = 'Läuft gerade';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector('#sheet .btn.primary').click();
+  })()`);
+  await sleep(300);
+  const nowBar = await cdp.eval(`(() => {
+    const bar = document.getElementById('nowbar');
+    if (bar.hidden) return { hidden: true };
+    return {
+      label: bar.querySelector('.nb-label').textContent,
+      title: bar.querySelector('.nb-title').textContent,
+      time: bar.querySelector('.nb-time').textContent,
+    };
+  })()`);
+  check('Jetzt-Leiste zeigt den laufenden Block',
+    nowBar.title === 'Läuft gerade' && /Jetzt|Als Nächstes/.test(nowBar.label || ''), JSON.stringify(nowBar));
+  check('Sie nennt die verbleibende Zeit', /min|h/.test(nowBar.time || ''), JSON.stringify(nowBar));
+  await cdp.eval(`(() => {
+    const b = [...document.querySelectorAll('.block')].find(n => n._occ.title === 'Läuft gerade');
+    const r = b.getBoundingClientRect();
+    b.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: r.x + 20, clientY: r.y + 8 }));
+  })()`);
+  await sleep(150);
+  await cdp.eval(`[...document.querySelectorAll('#menu button')].find(b => b.textContent.includes('Diesen Termin löschen') || b.textContent === 'Löschen').click()`);
+  await sleep(250);
+
   // --- Schnellwahl im Editor ---
   await cdp.eval(`document.getElementById('btn-add').click()`);
   await sleep(250);
@@ -359,6 +392,12 @@ async function main() {
     await cdp.eval(`!!document.querySelector('.ring-value')`));
   check('Laufende Session erscheint in der Kopfzeile',
     await cdp.eval(`!document.getElementById('session-pill').hidden`));
+  check('…und in der Jetzt-Leiste, mit Restzeit',
+    await cdp.eval(`(() => {
+      const bar = document.getElementById('nowbar');
+      return !bar.hidden && bar.querySelector('.nb-label').textContent === 'Fokus'
+        && /noch|Zeit ist um/.test(bar.querySelector('.nb-time').textContent);
+    })()`));
   await shot('09-fokus');
 
   await cdp.eval(`[...document.querySelectorAll('.focus-actions .btn')].find(b => b.textContent === 'Pause').click()`);
@@ -615,6 +654,11 @@ async function main() {
   await sleep(250);
   check('Kopfzeile bleibt einzeilig',
     await cdp.eval(`document.querySelector('.topbar-row').getBoundingClientRect().height < 56`));
+  check('Der Titel wird in der Kopfzeile nicht zum Kürzel',
+    await cdp.eval(`(() => {
+      const t = document.getElementById('range-title');
+      return t.getBoundingClientRect().width > 90 && t.textContent.length > 4;
+    })()`), 'zu wenig Platz für das Datum');
   // Handy-Feinheiten, die sonst leise kaputtgehen
   await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
   await goto(`http://127.0.0.1:${PORT}/`);
