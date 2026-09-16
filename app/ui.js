@@ -61,14 +61,25 @@ export function openMenu(items, anchorRect) {
       onclick: () => { closeMenu(); item.onClick(); },
     }, [item.label]));
   }
+  // Auf dem Handy fährt das Menü als Blatt von unten hoch – große Ziele,
+  // erreichbar für den Daumen. Am Rechner hängt es an seinem Auslöser.
+  const asSheet = matchMedia('(max-width: 700px)').matches;
+  menu.classList.toggle('as-sheet', asSheet);
   menu.hidden = false;
-  const w = menu.offsetWidth;
-  const h = menu.offsetHeight;
-  // An einem Punkt (Kontextmenü) links ausrichten, an einer Schaltfläche rechtsbündig.
-  const wanted = anchorRect.width ? anchorRect.right - w : anchorRect.left;
-  menu.style.left = `${Math.max(8, Math.min(wanted, window.innerWidth - w - 8))}px`;
-  const top = anchorRect.bottom + 6;
-  menu.style.top = `${Math.max(8, Math.min(top, window.innerHeight - h - 8))}px`;
+  if (!asSheet) {
+    menu.style.left = '';
+    menu.style.top = '';
+    const w = menu.offsetWidth;
+    const h = menu.offsetHeight;
+    // An einem Punkt (Kontextmenü) links ausrichten, an einer Schaltfläche rechtsbündig.
+    const wanted = anchorRect.width ? anchorRect.right - w : anchorRect.left;
+    menu.style.left = `${Math.max(8, Math.min(wanted, window.innerWidth - w - 8))}px`;
+    const top = anchorRect.bottom + 6;
+    menu.style.top = `${Math.max(8, Math.min(top, window.innerHeight - h - 8))}px`;
+  } else {
+    menu.style.left = '';
+    menu.style.top = '';
+  }
   setTimeout(() => document.addEventListener('pointerdown', onDocDown, { once: true }), 0);
 }
 

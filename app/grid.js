@@ -9,6 +9,7 @@ let buckets = new Map();
 let nowTimer = null;
 let didInitialScroll = false;
 let focusedKey = null;      // Block, der zuletzt die Tastatur hatte
+let lastCenteredDate = null;// zuletzt seitlich angesteuerter Tag
 let pendingFocusKey = null; // Schlüssel, den der Block nach der Änderung trägt
 
 export function initGrid(appRef) {
@@ -30,6 +31,17 @@ const minToY = (min) => (min - dayStartMin()) * pxPerMin();
 const yToMin = (y) => y / pxPerMin() + dayStartMin();
 const snapMin = (min) => Math.round(min / settings().snap) * settings().snap;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+/**
+ * Kann das Raster seitlich gescrollt werden? (Woche auf schmalen Geräten)
+ * Die reine Breitenmessung genügt nicht: nach einem Ansichtswechsel behält der
+ * Browser kurz seine alte Scrollbreite. Deshalb zählt, ob Querscrollen erlaubt ist.
+ */
+function scrollsSideways() {
+  const scroller = document.getElementById('grid-scroll');
+  if (getComputedStyle(scroller).overflowX !== 'auto') return false;
+  return scroller.scrollWidth - scroller.clientWidth > 4;
+}
 
 export function visibleDates() {
   const s = getState();
@@ -66,11 +78,23 @@ export function renderPlanner() {
     else focusedKey = null;
   }
 
+  const scroller = document.getElementById('grid-scroll');
   if (!didInitialScroll) {
     didInitialScroll = true;
-    const scroller = document.getElementById('grid-scroll');
     const target = minToY(clamp(nowMinutes() - 60, dayStartMin(), dayEndMin())) - 20;
     scroller.scrollTop = Math.max(0, target);
+  }
+  // Schmale Wochenansicht scrollt seitlich – der gewählte Tag soll sichtbar sein.
+  if (!scrollsSideways()) {
+    scroller.scrollLeft = 0;
+    lastCenteredDate = null;
+  } else if (app.cursor !== lastCenteredDate) {
+    lastCenteredDate = app.cursor;
+    const col = scroller.querySelector(`.col[data-date="${app.cursor}"]`);
+    if (col) {
+      const left = col.offsetLeft - parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gutter-w') || 0);
+      scroller.scrollTo({ left: Math.max(0, left), behavior: 'auto' });
+    }
   }
 }
 
@@ -110,6 +134,9 @@ function renderColumns(dates) {
   const columns = document.getElementById('columns');
   columns.style.gridTemplateColumns = `repeat(${dates.length}, 1fr)`;
   columns.style.height = `${height}px`;
+  // Schmale Spalten (Woche auf dem Handy) zeigen nur noch den Titel einzeilig.
+  const colWidth = columns.getBoundingClientRect().width / dates.length;
+  columns.classList.toggle('narrow', colWidth < 96);
   const today = todayYmd();
 
   const cols = dates.map((d) => {
@@ -439,7 +466,9 @@ function startCreateGesture(e) {
       const dx = ev.clientX - startXTouch;
       const dy = ev.clientY - startY;
       if (!mode && Math.max(Math.abs(dx), Math.abs(dy)) > 8) {
-        mode = Math.abs(dx) > Math.abs(dy) * 1.4 ? 'swipe' : 'scroll';
+        // Wo seitlich gescrollt wird, übernimmt der Browser die Waagerechte.
+        const horizontal = Math.abs(dx) > Math.abs(dy) * 1.4;
+        mode = horizontal && !scrollsSideways() ? 'swipe' : (horizontal ? 'none' : 'scroll');
       }
       if (mode === 'scroll') { scroller.scrollTop -= ev.clientY - panLast; panLast = ev.clientY; }
     };
@@ -448,7 +477,7 @@ function startCreateGesture(e) {
       col.removeEventListener('pointerup', onUp);
       col.removeEventListener('pointercancel', onUp);
       const dx = ev.clientX - startXTouch;
-      if (mode === 'swipe' && Math.abs(dx) > 55) app.step(dx < 0 ? 1 : -1);
+      if (mode === 'swipe' && Math.abs(dx) > 55 && !scrollsSideways()) app.step(dx < 0 ? 1 : -1);
       else if (!mode) app.openEditor(null, { date, start: startMin, duration: 60 });
     };
     col.setPointerCapture(e.pointerId);

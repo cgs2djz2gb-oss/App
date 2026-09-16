@@ -517,8 +517,18 @@ async function main() {
   await setViewport(390, 844, true);
   await goto(`http://127.0.0.1:${PORT}/`);
 
-  // Wischgeste: nach links blättert vorwärts
+  // Wischgeste: nach links blättert vorwärts (in der Tagesansicht; die Woche
+  // scrollt auf schmalen Geräten stattdessen seitlich)
+  await cdp.eval(`(() => {
+    const app = document.getElementById('app');
+    if (app.dataset.view !== 'day') document.getElementById('btn-viewtoggle').click();
+  })()`);
+  await sleep(300);
   const titleBefore = await cdp.eval(`document.getElementById('range-title').textContent`);
+  const swipeContext = await cdp.eval(`(() => {
+    const sc = document.getElementById('grid-scroll');
+    return { view: document.getElementById('app').dataset.view, scrollable: sc.scrollWidth - sc.clientWidth > 4 };
+  })()`);
   await cdp.eval(`(() => {
     const col = document.querySelector('.col');
     const r = col.getBoundingClientRect();
@@ -533,17 +543,80 @@ async function main() {
   await sleep(300);
   check('Wischen blättert die Ansicht weiter',
     (await cdp.eval(`document.getElementById('range-title').textContent`)) !== titleBefore,
-    `${titleBefore} bleibt stehen`);
+    `${titleBefore} bleibt stehen (${JSON.stringify(swipeContext)})`);
   await cdp.eval(`document.getElementById('btn-today').click()`);
   await sleep(200);
 
   check('Kompakter Ansichts-Umschalter sichtbar auf dem Handy',
     await cdp.eval(`getComputedStyle(document.getElementById('btn-viewtoggle')).display !== 'none'`));
-  await cdp.eval(`document.getElementById('btn-viewtoggle').click()`);
-  await sleep(300);
   check('Tagesansicht zeigt eine Spalte', (await cdp.eval(`document.querySelectorAll('.col').length`)) === 1);
+
+  // Woche auf dem Handy: seitlich scrollbar statt gequetscht
+  await cdp.eval(`document.getElementById('btn-viewtoggle').click()`);
+  await sleep(350);
+  const weekOnPhone = await cdp.eval(`(() => {
+    const sc = document.getElementById('grid-scroll');
+    const col = document.querySelector('.col');
+    return {
+      scrollable: sc.scrollWidth - sc.clientWidth > 4,
+      colWidth: Math.round(col.getBoundingClientRect().width),
+      stickyHead: getComputedStyle(document.getElementById('grid-head')).position,
+    };
+  })()`);
+  check('Woche am Handy scrollt seitlich mit lesbaren Spalten',
+    weekOnPhone.scrollable && weekOnPhone.colWidth >= 100, JSON.stringify(weekOnPhone));
+  check('Kopfzeile des Rasters bleibt beim Scrollen stehen', weekOnPhone.stickyHead === 'sticky');
+  check('Der gewählte Tag ist dabei im Blick',
+    await cdp.eval(`(() => {
+      const sc = document.getElementById('grid-scroll');
+      const col = document.querySelector('.col[data-date="' + document.querySelector('.head-cell.sel, .head-cell.today').dataset.date + '"]');
+      if (!col) return false;
+      const r = col.getBoundingClientRect();
+      return r.left < innerWidth && r.right > 0;
+    })()`));
+  await cdp.eval(`document.getElementById('btn-viewtoggle').click()`);
+  await sleep(250);
   check('Kopfzeile bleibt einzeilig',
     await cdp.eval(`document.querySelector('.topbar-row').getBoundingClientRect().height < 56`));
+  // Handy-Feinheiten, die sonst leise kaputtgehen
+  await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+  await goto(`http://127.0.0.1:${PORT}/`);
+  const touchUi = await cdp.eval(`(() => {
+    const px = (el, prop) => parseFloat(getComputedStyle(el)[prop]);
+    const input = document.getElementById('input-weektask');
+    document.querySelector('.tabbar button[data-tab="side"]').click();
+    const side = document.getElementById('side');
+    return {
+      inputFont: px(input, 'fontSize'),
+      sidePadBottom: px(side, 'paddingBottom'),
+      tabbarHeight: Math.round(document.querySelector('.tabbar').getBoundingClientRect().height),
+    };
+  })()`);
+  check('Eingabefelder lösen auf dem iPhone kein Zoomen aus', touchUi.inputFont >= 16,
+    `${touchUi.inputFont}px`);
+  check('Aufgabenliste endet über der Tab-Leiste',
+    touchUi.sidePadBottom >= touchUi.tabbarHeight, JSON.stringify(touchUi));
+  const miniBtn = await cdp.eval(`(() => {
+    document.getElementById('input-daytodo').value = 'Tippziel prüfen';
+    document.getElementById('form-daytodo').dispatchEvent(new Event('submit', { cancelable: true }));
+    const b = document.querySelector('#list-daytodos .mini-btn');
+    const r = b.getBoundingClientRect();
+    return Math.round(Math.min(r.width, r.height));
+  })()`);
+  check('Kleine Knöpfe sind mit dem Finger treffbar', miniBtn >= 32, `${miniBtn}px`);
+  await cdp.eval(`document.querySelector('.tabbar button[data-tab="planner"]').click()`);
+  await sleep(150);
+  await cdp.eval(`document.getElementById('btn-menu').click()`);
+  await sleep(200);
+  const menuBox = await cdp.eval(`(() => {
+    const m = document.getElementById('menu');
+    const r = m.getBoundingClientRect();
+    return { sheet: m.classList.contains('as-sheet'), width: Math.round(r.width), bottom: Math.round(innerHeight - r.bottom) };
+  })()`);
+  check('Menü fährt am Handy als Blatt von unten hoch',
+    menuBox.sheet && menuBox.width > 330 && menuBox.bottom >= 0, JSON.stringify(menuBox));
+  await cdp.eval(`document.getElementById('menu').hidden = true`);
+
   check('Tab-Leiste auf dem Handy sichtbar',
     await cdp.eval(`getComputedStyle(document.querySelector('.tabbar')).display !== 'none'`));
   await shot('04-tag-mobil');

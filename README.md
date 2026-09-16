@@ -65,8 +65,12 @@ die App sucht dafür automatisch die nächste freie Lücke im Tag.
 - Tastatur: Blöcke sind mit `Tab` erreichbar, Pfeile verschieben, `⇧`+Pfeil dehnt,
   `⌥`+Pfeil in 5-Minuten-Schritten, `Enter` öffnet, `Entf` löscht, `F` startet die Session
 - Aufgaben lassen sich aus der Seitenleiste direkt ins Raster ziehen
-- Auf dem Handy: waagerecht wischen blättert, senkrecht scrollt, Tippen legt an,
-  langes Drücken auf einem Block startet das Verschieben
+- Auf dem Handy: die App startet in der Tagesansicht, waagerecht wischen blättert,
+  senkrecht scrollt, Tippen legt an, langes Drücken auf einem Block startet das Verschieben
+- Die Wochenansicht scrollt auf schmalen Geräten seitlich (Stundenleiste und Kopfzeile
+  bleiben stehen), statt sieben Spalten zu Streifen zu quetschen
+- Menü, Editor und Auswahl fahren als Blatt von unten hoch; Eingabefelder lösen kein
+  Zoomen aus, Tippziele sind fingergerecht
 
 **Überblick & Ziele**
 - Farben lassen sich benennen (Lernen, Uni, Sport, Nebenjob …) – die Woche wird danach aufgeschlüsselt
@@ -121,7 +125,7 @@ Jeder Static-Hoster genügt, die App braucht keinen Build-Schritt.
 ```bash
 npm run dev          # http://localhost:4173
 npm test             # 29 Logiktests (Serien, Datum, Vorlagen, Übertragung, Sicherung, Speicher)
-npm run test:browser # 58 End-to-End-Checks im echten Chromium (Ziehen, Tastatur, Kontextmenü,
+npm run test:browser # 65 End-to-End-Checks im echten Chromium (Ziehen, Tastatur, Kontextmenü,
                      # Fokus-Session, Vorlagen, Übertragung, Sicherung, Kategorien,
                      # Druckansicht, Mobil, Dunkelmodus)
 ```
@@ -146,7 +150,8 @@ app/
   transfer.js         Übertragung zwischen Geräten per Link
   ui.js               Sheet, Menü, Toasts
 sw.js                 Service Worker (Offline)
-scripts/              Dev-Server, Icon-Generator, Browser-Test, Einzeldatei-Build
+scripts/              Dev-Server, Icon-Generator, Browser-Test, Einzeldatei-Build,
+                      Bildschirmfotos im Handyformat
 tests/run.mjs         Logiktests
 ```
 

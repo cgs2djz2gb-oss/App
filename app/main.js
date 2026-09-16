@@ -5,7 +5,7 @@ import {
 import {
   load, getState, setSetting, undo, redo, exportJson, importJson, createBlock, uid,
   COLORS, patchOccurrence, deleteOccurrence, saveBackup, getBackupInfo, restoreBackup,
-  categoryName, setCategoryName, setCategoryGoal, flush, wipeAll,
+  categoryName, setCategoryName, setCategoryGoal, flush, wipeAll, isFreshStart,
 } from './store.js';
 import { initGrid, renderPlanner } from './grid.js';
 import { initPanels, renderPanels } from './panels.js';
@@ -16,6 +16,12 @@ import { initSession, startSession, openFocus, renderPill } from './session.js';
 import { el, openMenu, closeMenu, openSheet, closeSheet, isSheetOpen, toast, choose } from './ui.js';
 
 load();
+
+// Auf einem Handy ist die Wochenansicht zum Planen zu eng - beim allerersten
+// Start beginnt die App dort mit dem Tag. Wer umschaltet, behält seine Wahl.
+if (isFreshStart() && matchMedia('(max-width: 700px)').matches) {
+  setSetting('view', 'day');
+}
 
 export const app = {
   cursor: todayYmd(),
@@ -75,14 +81,16 @@ function renderHeader() {
     const a = parseYmd(start);
     const b = parseYmd(end);
     const sameMonth = a.getMonth() === b.getMonth();
+    const month = narrow ? MONTHS[b.getMonth()].slice(0, 3) : MONTHS[b.getMonth()];
     title.textContent = sameMonth
-      ? `${a.getDate()}.–${b.getDate()}. ${MONTHS[b.getMonth()]}`
+      ? `${a.getDate()}.–${b.getDate()}. ${month}`
       : `${fmtDateShort(start)}–${fmtDateShort(end)}`;
     sub.textContent = `KW ${week} · ${b.getFullYear()}`;
   }
   document.querySelectorAll('.segmented button').forEach((b) =>
     b.classList.toggle('active', b.dataset.view === app.view));
   document.getElementById('btn-viewtoggle').textContent = app.view === 'day' ? 'Woche' : 'Tag';
+  document.getElementById('app').dataset.view = app.view;
 }
 
 function step(dir) {
@@ -269,7 +277,13 @@ async function doRestore() {
 
 function openMainMenu(anchor) {
   const backup = getBackupInfo();
+  // Zuerst, was man oft braucht; Einstellungen und Datenpflege danach.
   openMenu([
+    { label: 'Kategorien benennen…', onClick: openCategorySheet },
+    { label: 'Wochen-Vorlagen…', onClick: () => openTemplateSheet(app) },
+    { label: 'Auf anderes Gerät übertragen…', onClick: openTransferSheet },
+    { label: 'Woche drucken…', onClick: () => { closeMenu(); setTimeout(() => window.print(), 60); } },
+    '-',
     { type: 'title', label: 'Tagesraster' },
     { type: 'custom', node: numberSetting('Beginn (Uhr)', 'dayStart', 0, 12) },
     { type: 'custom', node: numberSetting('Ende (Uhr)', 'dayEnd', 13, 24) },
@@ -277,19 +291,14 @@ function openMainMenu(anchor) {
     { type: 'custom', node: weekendSetting() },
     { type: 'custom', node: themeSetting() },
     '-',
-    { label: 'Kategorien benennen…', onClick: openCategorySheet },
-    { label: 'Wochen-Vorlagen…', onClick: () => openTemplateSheet(app) },
-    { label: 'Auf anderes Gerät übertragen…', onClick: openTransferSheet },
-    '-',
     { label: 'Daten sichern (JSON)', onClick: doExport },
     { label: 'Daten laden (JSON)', onClick: doImport },
     { label: 'Beispielwoche einfügen', onClick: seedDemo },
-    { label: 'Woche drucken…', onClick: () => { closeMenu(); setTimeout(() => window.print(), 60); } },
-    '-',
     backup && {
       label: `Sicherung zurückholen (${backupLabel(backup)})`,
       onClick: doRestore,
     },
+    '-',
     { label: 'Alle Daten löschen', onClick: wipe },
     { label: 'Kurzbefehle & Hilfe', onClick: showHelp },
   ].filter(Boolean), anchor.getBoundingClientRect());

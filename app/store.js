@@ -88,14 +88,21 @@ function normalizeBlock(b) {
 }
 
 let state = defaultState();
+let startedFresh = true;   // true, wenn beim Start nichts gespeichert war
 let undoStack = [];
 let redoStack = [];
 const listeners = new Set();
 let saveTimer = null;
 
+/** Gab es beim Start noch keine gespeicherten Daten? */
+export function isFreshStart() {
+  return startedFresh;
+}
+
 export function load() {
   try {
     const raw = localStorage.getItem(KEY);
+    startedFresh = !raw;
     state = migrate(raw ? JSON.parse(raw) : null);
   } catch (err) {
     console.warn('Konnte Daten nicht laden:', err);

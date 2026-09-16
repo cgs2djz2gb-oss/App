@@ -148,6 +148,7 @@ ul { margin: 0; padding: 0; list-style: none; }
   display: grid; grid-template-columns: var(--gutter-w) 1fr;
   border-bottom: 1px solid var(--line); background: var(--bg-elev);
   padding-left: var(--sal);
+  position: sticky; top: 0; z-index: 8;
 }
 .head-cols { display: grid; }
 .head-cell {
@@ -164,7 +165,7 @@ ul { margin: 0; padding: 0; list-style: none; }
 .head-cell .load { font-size: 10px; color: var(--text-faint); }
 
 /* ---------- Grid ---------- */
-.grid-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; background: var(--bg-elev); }
+.grid-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; background: var(--bg-elev); overscroll-behavior: contain; }
 .grid { display: grid; grid-template-columns: var(--gutter-w) 1fr; position: relative; padding-left: var(--sal); }
 .gutter { position: relative; }
 .gutter .hour-label {
@@ -196,15 +197,26 @@ ul { margin: 0; padding: 0; list-style: none; }
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 .block.dragging { z-index: 20; box-shadow: var(--shadow); opacity: .96; transform: scale(1.015); }
-.block .b-title { font-weight: 600; font-size: 12.5px; line-height: 1.25; padding-right: 16px; }
+.block .b-title { font-weight: 600; font-size: 12.5px; line-height: 1.25; padding-right: 19px; }
 .block .b-meta { font-size: 11px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
-.block .b-badges { position: absolute; right: 5px; top: 4px; display: flex; gap: 3px; font-size: 10px; color: var(--fg-c); }
+.block .b-badges {
+  position: absolute; right: 4px; top: 3px; display: flex; gap: 3px;
+  font-size: 9.5px; line-height: 1; color: var(--fg-c); opacity: .8;
+}
 .block.short { padding-top: 1px; display: flex; gap: 6px; align-items: baseline; }
 .block.short .b-title { font-size: 11.5px; }
 .block.short .b-meta { font-size: 10px; }
 .handle { position: absolute; left: 0; right: 0; height: 9px; cursor: ns-resize; touch-action: none; }
 .handle.top { top: -1px; } .handle.bottom { bottom: -1px; }
 .block .prog { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--fg-c); opacity: .55; }
+.block { -webkit-touch-callout: none; }
+.columns.narrow .block { padding: 3px 5px; }
+.columns.narrow .b-title {
+  font-size: 11px; padding-right: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.columns.narrow .b-meta, .columns.narrow .b-badges { display: none; }
+.columns.narrow .block.short { padding-top: 0; }
 .block.ghost { opacity: .45; border-style: dashed; }
 .block.done { opacity: .55; }
 .block.done .b-title { text-decoration: line-through; }
@@ -446,6 +458,8 @@ input[type="checkbox"].cb:checked::after {
   .side {
     position: fixed; inset: 0; top: auto; width: 100%; height: 100%;
     border-left: 0; z-index: 25; padding-top: calc(var(--sat) + 56px);
+    /* Platz für die Tab-Leiste, sonst verschwindet die letzte Zeile darunter. */
+    padding-bottom: calc(var(--sab) + 72px);
   }
   .app:not([data-tab="side"]) .side { display: none; }
   .app[data-tab="side"] .planner { display: none; }
@@ -470,10 +484,53 @@ input[type="checkbox"].cb:checked::after {
     max-height: 92dvh; padding-bottom: var(--sab);
   }
   .fab { bottom: calc(var(--sab) + 12px); }
+  .toast-wrap { bottom: calc(var(--sab) + 74px); }
 }
 @media (max-width: 700px) {
   .segmented { display: none; }
   .view-toggle { display: inline-flex; align-items: center; padding: 0 10px; }
+
+  /* In der Tagesansicht steht das Datum schon in der Kopfzeile. */
+  .app[data-view="day"] .grid-head { display: none; }
+
+  /* Die Woche wird seitlich scrollbar, statt sieben Spalten zu Streifen zu quetschen. */
+  .app[data-view="week"] .grid-scroll { overflow-x: auto; scroll-snap-type: x proximity; }
+  .app[data-view="week"] .grid-head,
+  .app[data-view="week"] .grid { min-width: calc(var(--gutter-w) + 7 * 104px); }
+  .app[data-view="week"] .col, .app[data-view="week"] .head-cell { scroll-snap-align: start; }
+
+  /* Stundenleiste und die Ecke darüber bleiben beim Querscrollen stehen. */
+  .app[data-view="week"] .grid .gutter,
+  .app[data-view="week"] .grid-head > div:first-child {
+    position: sticky; left: 0; z-index: 5;
+    background: var(--bg-elev);
+    box-shadow: 1px 0 0 var(--line-soft);
+  }
+
+  .menu.as-sheet {
+    left: 8px; right: 8px; bottom: calc(var(--sab) + 8px); top: auto;
+    width: auto; max-height: 78dvh; overflow-y: auto;
+    border-radius: 16px; padding: 8px;
+  }
+  .menu.as-sheet button, .menu.as-sheet label.menu-item { padding: 13px 12px; font-size: 15px; }
+  .menu.as-sheet .menu-title { padding: 10px 12px 4px; }
+  .menu.as-sheet select, .menu.as-sheet input[type="number"] { padding: 8px 10px; }
+}
+
+/* Finger statt Mauszeiger: größere Ziele, keine Zoom-Sprünge beim Tippen. */
+@media (pointer: coarse) {
+  input, textarea, select { font-size: 16px; }
+  .add-row input { height: 40px; }
+  .btn, .btn.small { min-height: 40px; }
+  .icon-btn { min-width: 40px; height: 40px; }
+  .mini-btn { padding: 9px 11px; font-size: 15px; }
+  input[type="checkbox"].cb { width: 22px; height: 22px; }
+  input[type="checkbox"].cb:checked::after { left: 6.5px; top: 3px; width: 5px; height: 10px; }
+  .task-list li { padding: 9px 4px; }
+  .task-list .row-actions { opacity: 1; }
+  .swatch { width: 32px; height: 32px; }
+  .dow-picker button { width: 42px; height: 40px; }
+  .chip { padding: 9px 13px; font-size: 13.5px; }
 }
 @media (max-width: 420px) { .head-cell .dnum { font-size: 15px; width: 26px; height: 26px; line-height: 26px; } }
 
