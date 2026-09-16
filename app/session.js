@@ -58,9 +58,11 @@ const isPaused = () => !!session() && session().remaining !== null && session().
 
 function fmtClock(ms) {
   const total = Math.round(ms / 1000);
-  const m = Math.floor(total / 60);
   const sec = total % 60;
-  return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  const min = Math.floor(total / 60);
+  if (min < 60) return `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  // Ab einer Stunde lesbar als 1:45:20 statt 105:20.
+  return `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
 }
 
 export function startSession(occ) {

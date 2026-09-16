@@ -452,9 +452,12 @@ checkIncomingTransfer(app);
 // Wird der Übertragungslink in die schon geöffnete App eingefügt, ändert sich nur die Adresse.
 window.addEventListener('hashchange', () => checkIncomingTransfer(app));
 
-if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator) || !location.protocol.startsWith('http')) return;
   window.addEventListener('load', () => {
     // Relativ zum Dokument – funktioniert im Unterordner genauso wie im Wurzelverzeichnis.
     navigator.serviceWorker.register('sw.js').catch(() => {});
   });
 }
+
+registerServiceWorker();

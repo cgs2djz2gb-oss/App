@@ -317,7 +317,7 @@ async function main() {
   await sleep(400);
   check('Fokus-Session startet', await cdp.eval(`!document.getElementById('focus').hidden`));
   const clock = await cdp.eval(`document.querySelector('.focus-clock').textContent`);
-  check('Countdown läuft', /^\d{2}:\d{2}$/.test(clock), `Anzeige: ${clock}`);
+  check('Countdown läuft', /^(\d+:)?\d{2}:\d{2}$/.test(clock), `Anzeige: ${clock}`);
   check('Zeitring zeichnet den Fortschritt',
     await cdp.eval(`!!document.querySelector('.ring-value')`));
   check('Laufende Session erscheint in der Kopfzeile',

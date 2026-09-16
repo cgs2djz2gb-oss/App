@@ -69,6 +69,31 @@ const bundle = [
 ].join('\n');
 
 const css = slim(readFileSync(join(ROOT, 'styles.css'), 'utf8'));
+
+// Fassung für eine Artifact-Seite: dort kommt das HTML-Gerüst von außen,
+// die Datei beginnt also direkt mit Titel und Stil.
+if (process.env.ARTIFACT) {
+  const body = readFileSync(join(ROOT, 'index.html'), 'utf8')
+    .replace(/[\s\S]*?<body>/, '')
+    .replace(/<\/body>[\s\S]*/, '')
+    .replace('<script type="module" src="app/main.js"></script>', '');
+  const artifactCss = [
+    css,
+    '/* Das Gerüst der Seite polstert bereits um die Systemleisten herum. */',
+    ':root { --sat: 0px; --sab: 0px; --sal: 0px; --sar: 0px; }',
+    '.app { height: 100%; }',
+  ].join('\n');
+  const page = [
+    '<title>Tagwerk</title>',
+    `<style>\n${artifactCss}\n</style>`,
+    body.trim(),
+    // Kein Service Worker: die Seite wird nicht aus einem eigenen Verzeichnis ausgeliefert.
+    `<script>\n${bundle.replace('\nregisterServiceWorker();', '')}\n</script>`,
+  ].join('\n');
+  mkdirSync(OUT, { recursive: true });
+  writeFileSync(join(OUT, 'tagwerk.artifact.html'), page);
+  console.log(`${OUT}/tagwerk.artifact.html  ${(page.length / 1024).toFixed(1)} kB (Artifact-Fassung)`);
+}
 const html = readFileSync(join(ROOT, 'index.html'), 'utf8')
   .replace('<link rel="stylesheet" href="styles.css">', `<style>\n${css}\n</style>`)
   .replace('<script type="module" src="app/main.js"></script>', `<script>\n${bundle}\n</script>`);

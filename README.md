@@ -113,6 +113,8 @@ Jeder Static-Hoster genügt, die App braucht keinen Build-Schritt.
 - **Eigener Server:** Ordner hochladen. HTTPS ist Pflicht, sonst startet der Service Worker nicht.
 - **Ganz ohne Server:** `node scripts/build.mjs` erzeugt `dist/index.html` – eine einzige Datei,
   die sich per Doppelklick öffnen lässt und alles enthält.
+- **Als Artifact-Seite:** `ARTIFACT=1 node scripts/build.mjs <ziel>` schreibt `tagwerk.artifact.html`
+  ohne eigenes HTML-Gerüst (das bringt die Seite dort mit) und ohne Service-Worker-Anmeldung.
 
 ## Lokal starten
 
