@@ -272,8 +272,11 @@ async function main() {
       time: bar.querySelector('.nb-time').textContent,
     };
   })()`);
-  check('Jetzt-Leiste zeigt den laufenden Block',
-    nowBar.title === 'Läuft gerade' && /Jetzt|Als Nächstes/.test(nowBar.label || ''), JSON.stringify(nowBar));
+  // Welcher Block gerade dran ist, hängt von der Uhrzeit des Rechners ab –
+  // geprüft wird deshalb die Leiste selbst, nicht ein bestimmter Titel.
+  check('Jetzt-Leiste nennt den anstehenden Block',
+    /Jetzt|Als Nächstes/.test(nowBar.label || '') && (nowBar.title || '').length > 0,
+    JSON.stringify(nowBar));
   check('Sie nennt die verbleibende Zeit', /min|h/.test(nowBar.time || ''), JSON.stringify(nowBar));
   await cdp.eval(`(() => {
     const b = [...document.querySelectorAll('.block')].find(n => n._occ.title === 'Läuft gerade');

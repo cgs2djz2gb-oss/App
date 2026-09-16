@@ -127,6 +127,10 @@ if (process.env.PACKED) {
     '(async () => {',
     '  try {',
     '    const b64 = (await (await fetch("app.b64")).text()).trim();',
+    // Prüfsumme: eine unterwegs beschädigte Datei soll sich melden, nicht schweigen.
+    '    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(b64));',
+    '    const sum = [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, "0")).join("").slice(0, 16);',
+    '    if (sum !== SUM) throw new Error("Nutzdaten beschädigt: " + sum + " statt " + SUM);',
     '    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));',
     '    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));',
     '    const tag = document.createElement("script");',
@@ -141,14 +145,15 @@ if (process.env.PACKED) {
     '</script>',
   ].join('\n');
 
+  const sha = createHash('sha256').update(packed).digest('hex').slice(0, 16);
   const shell = readFileSync(join(ROOT, 'index.html'), 'utf8')
     .replace('<link rel="stylesheet" href="styles.css">', '')
-    .replace('<script type="module" src="app/main.js"></script>', loader);
+    .replace('<script type="module" src="app/main.js"></script>',
+      loader.replace('<script>', `<script>\nconst SUM = ${JSON.stringify(sha)};`));
   writeFileSync(join(OUT, 'index.html'), shell);
   writeFileSync(join(OUT, 'sw.js'), readFileSync(join(OUT, 'sw.js'), 'utf8')
     .replace("'./index.html', './manifest.webmanifest',", "'./index.html', './app.b64', './manifest.webmanifest',"));
 
-  const sha = createHash('sha256').update(packed).digest('hex').slice(0, 16);
   console.log(`gepackt          ${kb(shell.length)} Seite + ${kb(packed.length)} app.b64`);
   console.log(`app.b64          ${packed.length} Zeichen, sha256 ${sha}`);
 }
