@@ -348,6 +348,64 @@ function startBlockGesture(e, node, mode) {
 
   node.setPointerCapture(e.pointerId);
 
+  // Position des Griffs im Block, damit der Block beim Ziehen nicht springt.
+  const grabOffsetMin = yToMin(startY - node.getBoundingClientRect().top) - dayStartMin();
+  let lastPointer = { x: startX, y: startY };
+  let autoScrollFrame = null;
+
+  /** Uhrzeit unter dem Zeiger – unabhängig davon, wie weit inzwischen gescrollt wurde. */
+  const pointerMinutes = (clientY) => {
+    const col = node.parentElement;
+    const rect = col.getBoundingClientRect();
+    return yToMin(clientY - rect.top);
+  };
+
+  const applyPointer = () => {
+    const { x, y } = lastPointer;
+    if (mode === 'move') {
+      const maxStart = dayEndMin() - orig.duration;
+      next.start = clamp(snapMin(pointerMinutes(y) - grabOffsetMin), dayStartMin(), maxStart);
+      next.date = app.view === 'week' ? dateAtX(x) : orig.date;
+      const targetCol = columns.querySelector(`.col[data-date="${next.date}"]`);
+      if (targetCol && node.parentElement !== targetCol) {
+        targetCol.append(node);
+        node.style.left = '2px';
+        node.style.width = 'calc(100% - 4px)';
+      }
+      node.style.top = `${minToY(next.start)}px`;
+    } else if (mode === 'resize-bottom') {
+      const end = clamp(snapMin(pointerMinutes(y)), orig.start + settings().snap, dayEndMin());
+      next.start = orig.start;
+      next.duration = end - orig.start;
+      node.style.height = `${Math.max(next.duration * pxPerMin(), 17)}px`;
+    } else {
+      const end = orig.start + orig.duration;
+      next.start = clamp(snapMin(pointerMinutes(y)), dayStartMin(), end - settings().snap);
+      next.duration = end - next.start;
+      node.style.top = `${minToY(next.start)}px`;
+      node.style.height = `${Math.max(next.duration * pxPerMin(), 17)}px`;
+    }
+    const meta = node.querySelector('.b-meta');
+    if (meta) meta.textContent = `${fmtTime(next.start)}–${fmtTime(next.start + next.duration)}`;
+  };
+
+  /** Am oberen und unteren Rand mitscrollen, sonst endet das Ziehen am Bildrand. */
+  const stepAutoScroll = () => {
+    autoScrollFrame = null;
+    if (!active) return;
+    const rect = scroller.getBoundingClientRect();
+    const edge = 64;
+    let speed = 0;
+    if (lastPointer.y < rect.top + edge) speed = -(rect.top + edge - lastPointer.y);
+    else if (lastPointer.y > rect.bottom - edge) speed = lastPointer.y - (rect.bottom - edge);
+    if (speed) {
+      const before = scroller.scrollTop;
+      scroller.scrollTop += clamp(speed * 0.25, -22, 22);
+      if (scroller.scrollTop !== before) applyPointer();
+    }
+    autoScrollFrame = requestAnimationFrame(stepAutoScroll);
+  };
+
   const onMove = (ev) => {
     const dx = ev.clientX - startX;
     const dy = ev.clientY - startY;
@@ -368,36 +426,15 @@ function startBlockGesture(e, node, mode) {
     }
     moved = true;
     ev.preventDefault();
-
-    const deltaMin = snapMin(dy / pxPerMin());
-    if (mode === 'move') {
-      const maxStart = dayEndMin() - orig.duration;
-      next.start = clamp(snapMin(orig.start + deltaMin), dayStartMin(), maxStart);
-      next.date = app.view === 'week' ? dateAtX(ev.clientX) : orig.date;
-      const targetCol = columns.querySelector(`.col[data-date="${next.date}"]`);
-      if (targetCol && node.parentElement !== targetCol) {
-        targetCol.append(node);
-        node.style.left = '2px';
-        node.style.width = 'calc(100% - 4px)';
-      }
-      node.style.top = `${minToY(next.start)}px`;
-    } else if (mode === 'resize-bottom') {
-      const maxDur = dayEndMin() - orig.start;
-      next.duration = clamp(snapMin(orig.duration + deltaMin), settings().snap, maxDur);
-      node.style.height = `${Math.max(next.duration * pxPerMin(), 17)}px`;
-    } else {
-      const newStart = clamp(snapMin(orig.start + deltaMin), dayStartMin(), orig.start + orig.duration - settings().snap);
-      next.start = newStart;
-      next.duration = orig.start + orig.duration - newStart;
-      node.style.top = `${minToY(next.start)}px`;
-      node.style.height = `${Math.max(next.duration * pxPerMin(), 17)}px`;
-    }
-    const meta = node.querySelector('.b-meta');
-    if (meta) meta.textContent = `${fmtTime(next.start)}–${fmtTime(next.start + next.duration)}`;
+    lastPointer = { x: ev.clientX, y: ev.clientY };
+    applyPointer();
+    if (!autoScrollFrame) autoScrollFrame = requestAnimationFrame(stepAutoScroll);
   };
 
   const onUp = (ev) => {
     clearTimeout(longPress);
+    if (autoScrollFrame) cancelAnimationFrame(autoScrollFrame);
+    autoScrollFrame = null;
     node.releasePointerCapture?.(ev.pointerId);
     node.removeEventListener('pointermove', onMove);
     node.removeEventListener('pointerup', onUp);

@@ -23,7 +23,9 @@ die App sucht dafür automatisch die nächste freie Lücke im Tag.
 **Planen**
 - Wochen- und Tagesansicht, Raster frei einstellbar (5–60 min)
 - Blöcke ziehen (Zeit **und** Wochentag), an beiden Kanten dehnen
-- Anlegen: auf dem Mac ins leere Raster ziehen, auf dem Handy antippen
+- Anlegen: auf dem Mac ins leere Raster ziehen, auf dem Handy antippen –
+  im Editor füllt die Schnellwahl zuletzt benutzte Blöcke mit einem Tipp
+- Ziehen bis an den oberen oder unteren Rand scrollt das Raster mit
 - Überlappende Blöcke werden automatisch nebeneinander gelegt
 - 8 Farben, Notizen, „Erledigt"-Haken, Jetzt-Linie, Zoom, Dunkelmodus
 
@@ -124,8 +126,8 @@ Jeder Static-Hoster genügt, die App braucht keinen Build-Schritt.
 
 ```bash
 npm run dev          # http://localhost:4173
-npm test             # 29 Logiktests (Serien, Datum, Vorlagen, Übertragung, Sicherung, Speicher)
-npm run test:browser # 65 End-to-End-Checks im echten Chromium (Ziehen, Tastatur, Kontextmenü,
+npm test             # 30 Logiktests (Serien, Datum, Vorlagen, Übertragung, Sicherung, Speicher)
+npm run test:browser # 68 End-to-End-Checks im echten Chromium (Ziehen, Tastatur, Kontextmenü,
                      # Fokus-Session, Vorlagen, Übertragung, Sicherung, Kategorien,
                      # Druckansicht, Mobil, Dunkelmodus)
 ```

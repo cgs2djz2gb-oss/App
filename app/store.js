@@ -400,6 +400,27 @@ export function clearOccurrences(occs) {
   });
 }
 
+/**
+ * Zuletzt benutzte Blöcke als Schnellwahl: je Titel der jüngste Eintrag,
+ * damit ein neuer Block mit einem Tipp steht.
+ */
+export function recentBlocks(limit = 6) {
+  const seen = new Map();
+  // Bei gleicher Zeitmarke (im selben Millisekundenschlag angelegt) gilt der
+  // später eingefügte Block als der jüngere.
+  const newestFirst = state.blocks
+    .map((b, i) => ({ b, i }))
+    .sort((x, y) => (y.b.createdAt || 0) - (x.b.createdAt || 0) || y.i - x.i)
+    .map((entry) => entry.b);
+  for (const b of newestFirst) {
+    const title = (b.title || '').trim();
+    if (!title || seen.has(title)) continue;
+    seen.set(title, { title, color: b.color, duration: b.duration });
+    if (seen.size >= limit) break;
+  }
+  return [...seen.values()];
+}
+
 /** Anzeigename einer Farbe: eigener Name, sonst die Farbbezeichnung. */
 export function categoryName(color) {
   const own = state.settings.categories?.[color];

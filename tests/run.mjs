@@ -210,6 +210,19 @@ test('Einzelblock ohne Serie erscheint genau einmal', () => {
   assert.equal([...b.values()].flat().length, 1);
 });
 
+test('Schnellwahl zeigt zuletzt benutzte Blöcke, jeden Titel einmal', () => {
+  freshState();
+  store.createBlock({ title: 'Deep Work', date: '2026-09-14', start: 540, duration: 120, color: 'blau' });
+  store.createBlock({ title: 'Sport', date: '2026-09-14', start: 1080, duration: 60, color: 'tuerkis' });
+  store.createBlock({ title: 'Deep Work', date: '2026-09-15', start: 540, duration: 90, color: 'blau' });
+  store.createBlock({ title: '', date: '2026-09-15', start: 700, duration: 30 });
+
+  const recent = store.recentBlocks();
+  assert.deepEqual(recent.map((r) => r.title), ['Deep Work', 'Sport'], 'ohne Dubletten und ohne Titellose');
+  assert.equal(recent[0].duration, 90, 'die jüngste Fassung zählt');
+  assert.equal(recent[0].color, 'blau');
+});
+
 // ---------- Layout & Hilfen ----------
 test('Überlappende Blöcke bekommen eigene Spalten', () => {
   const occs = [

@@ -5,7 +5,7 @@ import {
 import {
   load, getState, setSetting, undo, redo, exportJson, importJson, createBlock, uid,
   COLORS, patchOccurrence, deleteOccurrence, saveBackup, getBackupInfo, restoreBackup,
-  categoryName, setCategoryName, setCategoryGoal, flush, wipeAll, isFreshStart,
+  categoryName, setCategoryName, setCategoryGoal, flush, wipeAll, isFreshStart, canUndo,
 } from './store.js';
 import { initGrid, renderPlanner } from './grid.js';
 import { initPanels, renderPanels } from './panels.js';
@@ -279,6 +279,10 @@ function openMainMenu(anchor) {
   const backup = getBackupInfo();
   // Zuerst, was man oft braucht; Einstellungen und Datenpflege danach.
   openMenu([
+    canUndo() && {
+      label: 'Letzte Änderung rückgängig',
+      onClick: () => { undo(); app.refresh(); toast('Rückgängig gemacht'); },
+    },
     { label: 'Kategorien benennen…', onClick: openCategorySheet },
     { label: 'Wochen-Vorlagen…', onClick: () => openTemplateSheet(app) },
     { label: 'Auf anderes Gerät übertragen…', onClick: openTransferSheet },

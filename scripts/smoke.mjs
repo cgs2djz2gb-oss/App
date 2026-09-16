@@ -251,6 +251,43 @@ async function main() {
   check('Kategoriename erscheint in der Auswertung',
     await cdp.eval(`[...document.querySelectorAll('.cat-name')].some(n => n.textContent === 'Lernen')`));
 
+  // --- Schnellwahl im Editor ---
+  await cdp.eval(`document.getElementById('btn-add').click()`);
+  await sleep(250);
+  const quickPick = await cdp.eval(`(() => {
+    const chip = document.querySelector('#sheet .chip.recent');
+    if (!chip) return null;
+    const title = chip.textContent;
+    chip.click();
+    return { title, filled: document.querySelector('#sheet input[type="text"]').value };
+  })()`);
+  check('Schnellwahl füllt einen neuen Block mit einem Tipp',
+    quickPick && quickPick.filled === quickPick.title, JSON.stringify(quickPick));
+  await cdp.eval(`document.querySelector('#sheet .btn.ghost').click()`);
+  await sleep(200);
+
+  // --- Ziehen bis an den Rand scrollt mit ---
+  await cdp.eval(`document.getElementById('grid-scroll').scrollTop = 0`);
+  await sleep(150);
+  const edgeDrag = await cdp.eval(pickVisible);
+  const scrollBefore = await cdp.eval(`document.getElementById('grid-scroll').scrollTop`);
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: edgeDrag.x, y: edgeDrag.y, button: 'left', clickCount: 1, buttons: 1 });
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: edgeDrag.x, y: edgeDrag.y + 40, button: 'left', buttons: 1 });
+  const bottomY = await cdp.eval(`document.getElementById('grid-scroll').getBoundingClientRect().bottom - 20`);
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: edgeDrag.x, y: bottomY, button: 'left', buttons: 1 });
+  await sleep(700);
+  const scrollDuring = await cdp.eval(`document.getElementById('grid-scroll').scrollTop`);
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: edgeDrag.x, y: bottomY, button: 'left', buttons: 0 });
+  await sleep(250);
+  const afterEdge = await cdp.eval(`(() => {
+    const b = [...document.querySelectorAll('.block')].find(n => n.dataset.key === ${JSON.stringify(edgeDrag.key)});
+    return b ? b._occ.start : null;
+  })()`);
+  check('Ziehen an den unteren Rand scrollt das Raster mit',
+    scrollDuring > scrollBefore + 40, `${scrollBefore} → ${scrollDuring}`);
+  check('Der Block landet dabei an der neuen Uhrzeit',
+    afterEdge !== null && afterEdge > edgeDrag.start, `${edgeDrag.start} → ${afterEdge}`);
+
   // --- Tastaturbedienung ---
   const kb = await cdp.eval(pickVisible);
   const press = async (key, opts = {}) => {

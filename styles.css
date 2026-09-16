@@ -355,6 +355,11 @@ input[type="checkbox"].cb:checked::after {
   background: var(--bg); cursor: pointer; font-size: 12.5px; color: var(--text-dim);
 }
 .chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.chip.recent { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; }
+.chip.recent::before {
+  content: ""; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--fg-c); flex: none;
+}
 .sheet-actions { display: flex; gap: 8px; justify-content: space-between; align-items: center; padding-top: 4px; }
 .checklist li { display: flex; gap: 8px; align-items: center; padding: 4px 0; }
 .checklist li input[type="text"] { flex: 1; border: 0; background: transparent; padding: 4px 2px; }
@@ -515,6 +520,10 @@ input[type="checkbox"].cb:checked::after {
   .menu.as-sheet button, .menu.as-sheet label.menu-item { padding: 13px 12px; font-size: 15px; }
   .menu.as-sheet .menu-title { padding: 10px 12px 4px; }
   .menu.as-sheet select, .menu.as-sheet input[type="number"] { padding: 8px 10px; }
+
+  /* Datum braucht die volle Breite, sonst wird die Dauer zum Schlitz. */
+  .sheet .row3 { grid-template-columns: 1fr 1fr; }
+  .sheet .row3 > :first-child { grid-column: 1 / -1; }
 }
 
 /* Finger statt Mauszeiger: größere Ziele, keine Zoom-Sprünge beim Tippen. */

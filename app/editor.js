@@ -2,7 +2,7 @@
 import { fmtTime, parseTime, fmtDateShort, DOW_SHORT, addDays } from './dates.js';
 import {
   COLORS, uid, createBlock, patchOccurrence, moveOccurrence, deleteOccurrence,
-  toggleOccurrenceTodo, getBlock,
+  toggleOccurrenceTodo, getBlock, recentBlocks,
 } from './store.js';
 import { el, openSheet, closeSheet, toast, choose } from './ui.js';
 import { startSession } from './session.js';
@@ -62,13 +62,32 @@ export function openBlockEditor(occ, draft, app) {
       },
     })));
 
+  // Schnellwahl: bei einem neuen Block die zuletzt benutzten Titel anbieten.
+  const recent = isNew ? recentBlocks() : [];
+  const recentRow = recent.length ? el('div', { class: 'field' }, [
+    el('label', { text: 'Zuletzt benutzt' }),
+    el('div', { class: 'chips' }, recent.map((r) => el('button', {
+      type: 'button', class: 'chip recent',
+      style: `--fg-c:var(--c-${r.color})`,
+      onclick: () => {
+        model.title = r.title;
+        model.color = r.color;
+        model.duration = r.duration;
+        titleInput.value = r.title;
+        durInput.value = String(r.duration);
+        swatches.querySelectorAll('.swatch').forEach((sw, i) =>
+          sw.setAttribute('aria-pressed', COLORS[i].id === r.color ? 'true' : 'false'));
+      },
+    }, [r.title]))),
+  ]) : null;
+
   const dateInput = el('input', { type: 'date', value: model.date, onchange: (e) => { model.date = e.target.value || model.date; } });
   const startInput = el('input', {
     type: 'time', step: '300', value: fmtTime(model.start),
     onchange: (e) => { const v = parseTime(e.target.value); if (v !== null) model.start = v; },
   });
   const durInput = el('input', {
-    type: 'number', min: '5', step: '5', value: String(model.duration),
+    type: 'number', min: '5', step: '5', inputmode: 'numeric', value: String(model.duration),
     onchange: (e) => { model.duration = Math.max(5, Number(e.target.value) || 60); },
   });
 
@@ -267,6 +286,7 @@ export function openBlockEditor(occ, draft, app) {
     ]),
     el('div', { class: 'sheet-body' }, [
       el('div', { class: 'field' }, [el('label', { text: 'Titel' }), titleInput]),
+      recentRow,
       el('div', { class: 'field' }, [el('label', { text: 'Farbe' }), swatches]),
       el('div', { class: 'row3' }, [
         el('div', { class: 'field' }, [el('label', { text: 'Datum' }), dateInput]),
