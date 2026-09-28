@@ -57,9 +57,15 @@ function wrap(name, src) {
   return `__def('${name}', (__exports, __req) => {\n${slim(code)}\n${names ? `Object.assign(__exports, { ${names} });` : ''}\n});`;
 }
 
+// Baustand: steht im Menü und im Titel, damit mehrere heruntergeladene
+// Fassungen auf dem Rechner unterscheidbar bleiben.
+const BUILD_STAMP = process.env.BUILD_STAMP
+  || new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
+
 const bundle = [
   '(() => {',
   '"use strict";',
+  `const __TAGWERK_BUILD__ = ${JSON.stringify(BUILD_STAMP)};`,
   'const __mods = {};',
   'const __def = (name, fn) => { __mods[name] = { fn, exports: null }; };',
   'const __req = (name) => { const m = __mods[name]; if (!m.exports) { m.exports = {}; m.fn(m.exports, __req); } return m.exports; };',
@@ -96,7 +102,11 @@ if (process.env.ARTIFACT) {
 }
 const html = readFileSync(join(ROOT, 'index.html'), 'utf8')
   .replace('<link rel="stylesheet" href="styles.css">', `<style>\n${css}\n</style>`)
-  .replace('<script type="module" src="app/main.js"></script>', `<script>\n${bundle}\n</script>`);
+  .replace('<script type="module" src="app/main.js"></script>', `<script>\n${bundle}\n</script>`)
+  // Der Titel trägt den Baustand: so heißt die Datei im Dock und in der
+  // Spotlight-Suche nicht bei jeder Fassung gleich.
+  .replace('<title>Tagwerk – Tages- & Wochenplaner</title>',
+    `<title>Tagwerk ${BUILD_STAMP.slice(0, 10)}</title>`);
 
 mkdirSync(join(OUT, 'icons'), { recursive: true });
 writeFileSync(join(OUT, 'index.html'), html);

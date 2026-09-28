@@ -124,7 +124,10 @@ Jeder Static-Hoster genügt, die App braucht keinen Build-Schritt.
 - **Netlify/Cloudflare Pages:** Repo verbinden, kein Build-Befehl, Ausgabeverzeichnis `.`
 - **Eigener Server:** Ordner hochladen. HTTPS ist Pflicht, sonst startet der Service Worker nicht.
 - **Ganz ohne Server:** `node scripts/build.mjs` erzeugt `dist/index.html` – eine einzige Datei,
-  die sich per Doppelklick öffnen lässt und alles enthält.
+  die sich per Doppelklick öffnen lässt und alles enthält. Der Baustand landet im Titel
+  (`Tagwerk 2026-09-28`) und im Menü unter *Über Tagwerk*, damit sich mehrere
+  heruntergeladene Fassungen auf dem Rechner auseinanderhalten lassen –
+  mit `BUILD_STAMP=…` lässt er sich vorgeben.
 - **Als Artifact-Seite:** `ARTIFACT=1 node scripts/build.mjs <ziel>` schreibt `tagwerk.artifact.html`
   ohne eigenes HTML-Gerüst (das bringt die Seite dort mit) und ohne Service-Worker-Anmeldung.
 

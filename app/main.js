@@ -305,6 +305,7 @@ function openMainMenu(anchor) {
     '-',
     { label: 'Alle Daten löschen', onClick: wipe },
     { label: 'Kurzbefehle & Hilfe', onClick: showHelp },
+    { label: `Über Tagwerk · Stand ${BUILD}`, onClick: showAbout },
   ].filter(Boolean), anchor.getBoundingClientRect());
 }
 
@@ -345,6 +346,13 @@ async function wipe() {
   wipeAll();
   app.refresh();
   toast('Alle Daten gelöscht', { label: 'Doch nicht', onClick: doRestore });
+}
+
+/** Baustand dieser Fassung – vom Bauwerkzeug eingesetzt, sonst "Entwicklung". */
+const BUILD = typeof __TAGWERK_BUILD__ !== 'undefined' ? __TAGWERK_BUILD__ : 'Entwicklung';
+
+function showAbout() {
+  toast(`Tagwerk · Stand ${BUILD}`);
 }
 
 function showHelp() {
